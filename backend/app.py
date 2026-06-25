@@ -21,6 +21,7 @@ from services.rag_scheduler import start_scheduler, get_rag_update_scheduler, ge
 from services.orchestrator import AIOrchestrator
 from services.realtime_events import get_live_feed, get_geo_summary
 from services.llm import list_available_models
+from services import vision_service
 from auth import auth_service, require_auth
 from database import db
 from chat_management_api import chat_management_bp
@@ -182,6 +183,7 @@ def _extract_upload_payload(files, relative_paths, attachment_types):
             'text_extracted': False,
         }
 
+        # ── Text extraction (documents / plain text) ──────────────────────────
         if _can_extract_text(filename, content_type):
             text_content, extraction_method, extraction_warning = _extract_text_from_blob(
                 filename,
@@ -199,7 +201,30 @@ def _extract_upload_payload(files, relative_paths, attachment_types):
                     'path': rel_path,
                     'content': snippet,
                     'truncated': len(text_content) > len(snippet),
+                    'section_type': 'document',
                 })
+
+        # ── Vision analysis (PNG / JPG / SVG) ─────────────────────────────────
+        elif vision_service.is_supported_image(filename):
+            try:
+                logger.info("Running vision analysis on '%s' (%s)", filename, content_type)
+                vision_description = vision_service.analyze_image(blob, filename)
+                summary['text_extracted'] = True
+                summary['extraction_method'] = 'vision_analysis'
+                summary['text_chars'] = len(vision_description)
+                text_sections.append({
+                    'path': rel_path,
+                    'content': vision_description,
+                    'truncated': False,
+                    'section_type': 'image_analysis',
+                })
+                logger.info("Vision analysis complete for '%s'", filename)
+            except Exception as vision_err:
+                logger.error("Vision analysis failed for '%s': %s", filename, vision_err)
+                warnings.append(
+                    f"'{rel_path}': image analysis failed — {vision_err}. "
+                    "The model will only see filename and file size."
+                )
 
         file_summaries.append(summary)
 
@@ -224,7 +249,11 @@ def _build_upload_analysis_prompt(user_message, payload):
     sections = []
     used_chars = 0
     for section in payload['text_sections']:
-        heading = f"\n[File: {section['path']}]\n"
+        is_image = section.get('section_type') == 'image_analysis'
+        if is_image:
+            heading = f"\n[Image Analysis: {section['path']}]\n"
+        else:
+            heading = f"\n[File: {section['path']}]\n"
         content = section['content']
         chunk = heading + content
         if used_chars + len(chunk) > MAX_COMBINED_TEXT_CHARS:
@@ -245,13 +274,14 @@ def _build_upload_analysis_prompt(user_message, payload):
         f"{chr(10).join(file_lines) if file_lines else '- None'}\n\n"
         "Warnings and constraints:\n"
         f"{warning_text}\n\n"
-        "Extracted content snippets:\n"
+        "Extracted content and image descriptions:\n"
         f"{extracted_text}\n\n"
         "Instructions:\n"
-        "1) Directly answer the user's request using uploaded content.\n"
-        "2) Clearly separate confirmed findings from assumptions.\n"
-        "3) If information is missing (e.g., image pixels/PDF internals), say exactly what is missing and suggest next steps.\n"
-        "4) Keep the output practical and action-oriented."
+        "1) Directly answer the user's request using the uploaded content and image descriptions above.\n"
+        "2) For images, use the [Image Analysis] section which contains a visual description of what the image shows.\n"
+        "3) Clearly separate confirmed findings from assumptions.\n"
+        "4) If information is missing, say exactly what is missing and suggest next steps.\n"
+        "5) Keep the output practical and action-oriented."
     )
 
 

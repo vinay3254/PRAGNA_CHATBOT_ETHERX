@@ -316,16 +316,20 @@ def generate_completion(
 
         try:
             result = _call_deepseek_local(messages)
-            logger.info("✅ DeepSeek local response: %d chars", len(result))
+            if not result or not result.strip():
+                logger.warning("DeepSeek returned empty result — using fallback message")
+                return "I processed your request but couldn't generate a response. Please try rephrasing your message."
+            logger.info("DeepSeek local response: %d chars", len(result))
             return result
         except RuntimeError as e:
             error_msg = str(e)
-            logger.error("🔴 DEEPSEEK LOCAL FAILED: %s", error_msg)
-            return error_msg
+            logger.error("DEEPSEEK LOCAL FAILED: %s", error_msg)
+            return f"I encountered an error processing your request: {error_msg}"
         except Exception as e:
-            error_msg = f"❌ DEEPSEEK ERROR: {str(e)}"
+            error_msg = f"DEEPSEEK ERROR: {str(e)}"
             logger.error(error_msg)
-            return error_msg
+            return "Something went wrong during local inference. Please try again."
+
 
     # =========== STANDARD MODE (with fallbacks) ===========
     

@@ -335,20 +335,39 @@ class DeepSeekModelService:
             new_tokens = outputs[0][input_len:]
             raw_text = _tokenizer.decode(new_tokens, skip_special_tokens=True)
 
-            # ── Strip DeepSeek reasoning blocks ───────────────────────────
+            # ── Strip DeepSeek reasoning blocks ────────────────────────────
             cleaned = _clean_deepseek_output(raw_text)
+
+            # ── Handle empty cleaned output ─────────────────────────────────
+            # DeepSeek-R1 distill models sometimes produce ONLY a <think> block
+            # with no final answer. In that case we extract the last substantive
+            # paragraph from the thinking block itself as the response.
+            if not cleaned:
+                # Try to pull content from inside the <think> block
+                think_match = re.search(r"<think>(.*?)</think>", raw_text, re.DOTALL)
+                if think_match:
+                    think_content = think_match.group(1).strip()
+                    # Take the last 2 non-empty paragraphs as the answer
+                    paragraphs = [p.strip() for p in think_content.split("\n\n") if p.strip()]
+                    cleaned = "\n\n".join(paragraphs[-2:]) if paragraphs else think_content
+                    logger.info("Empty output after think-strip; using last %d paragraphs of think block", len(paragraphs[-2:]))
+                elif raw_text.strip():
+                    cleaned = raw_text.strip()
+                    logger.info("Empty cleaned output; falling back to raw_text")
+                else:
+                    cleaned = "I understand your question. Could you please provide more details so I can give you a more specific answer?"
+                    logger.warning("Model generated empty output — using fallback message")
 
             elapsed = time.time() - t0
             out_len = len(new_tokens)
             tok_per_s = out_len / elapsed if elapsed > 0 else 0.0
 
             logger.info(
-                "✅ DeepSeek response — %d tokens in %.1f s (%.1f tok/s) | %d chars",
+                "DeepSeek response — %d tokens in %.1f s (%.1f tok/s) | %d chars",
                 out_len, elapsed, tok_per_s, len(cleaned),
             )
 
-            # Return cleaned output; if cleaning removed everything, return raw
-            return cleaned if cleaned else raw_text.strip()
+            return cleaned
 
         except Exception as exc:
             # Surface CUDA OOM with a clear actionable message
