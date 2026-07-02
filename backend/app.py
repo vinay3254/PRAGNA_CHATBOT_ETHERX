@@ -9,6 +9,7 @@ import json
 import os
 import io
 import time
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 from llm_service import LLMService
@@ -795,7 +796,9 @@ def health_check():
     
     # Check 3: Database
     try:
-        db.session.execute('SELECT 1')
+        conn = db.get_connection()
+        conn.execute('SELECT 1')
+        conn.close()
         health_status['systems']['database'] = {'status': 'healthy'}
     except Exception as e:
         health_status['systems']['database'] = {'status': 'error', 'error': str(e)[:100]}

@@ -16,12 +16,12 @@ const _resolveModelProfileRouting = () => {
   const profile = rawProfile === "instant" ? "basic" : rawProfile === "expert" ? "pro" : rawProfile;
 
   const instantOverride =
-    import.meta.env.VITE_MODEL_PROFILE_LIGHT_KEY || "groq:llama-3.1-8b-instant";
+    import.meta.env.VITE_MODEL_PROFILE_LIGHT_KEY || "ollama:qwen3-vl:8b";
   const instantFallbacks =
     _csvToList(import.meta.env.VITE_MODEL_PROFILE_LIGHT_FALLBACKS) || [];
 
   const expertOverride =
-    import.meta.env.VITE_MODEL_PROFILE_HEAVY_KEY || "groq:llama3-70b-8192";
+    import.meta.env.VITE_MODEL_PROFILE_HEAVY_KEY || "ollama:qwen3-vl:8b";
   const expertFallbacks =
     _csvToList(import.meta.env.VITE_MODEL_PROFILE_HEAVY_FALLBACKS) || [];
 
@@ -30,12 +30,7 @@ const _resolveModelProfileRouting = () => {
       model_override: expertOverride,
       fallback_models: expertFallbacks.length
         ? expertFallbacks
-        : [
-            "groq:llama3-70b-8192",
-            "groq:mixtral-8x7b-32768",
-            "ollama:gemma3:12b",
-            "groq:llama-3.1-8b-instant",
-          ],
+        : ["ollama:qwen3-vl:8b"],
     };
   }
 
@@ -43,7 +38,7 @@ const _resolveModelProfileRouting = () => {
     model_override: instantOverride,
     fallback_models: instantFallbacks.length
       ? instantFallbacks
-      : ["groq:llama-3.1-8b-instant", "ollama:qwen3:8b", "ollama:qwen3:4b"],
+      : ["ollama:qwen3-vl:8b"],
   };
 };
 

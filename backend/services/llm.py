@@ -159,7 +159,7 @@ def _resolve_request_config(model_key: Optional[str]) -> Dict[str, object]:
         return {
             "provider": "ollama",
             "model": model_name,
-            "endpoint": f"{config.OLLAMA_API_URL.rstrip('/')}/chat/completions",
+            "endpoint": f"{config.OLLAMA_API_URL.rstrip('/')}/v1/chat/completions",
             "api_key": "",
             "timeout": config.OLLAMA_TIMEOUT,
             "requires_api_key": False,
@@ -220,6 +220,8 @@ def _request_completion(messages: List[Dict[str, str]], model_key: Optional[str]
         "max_tokens": 1024,
         "top_p": 0.9,
     }
+    if request_cfg["provider"] == "ollama":
+        payload["think"] = False  # disable thinking mode for qwen3/deepseek-r1 models
     headers = {"Content-Type": "application/json"}
     if request_cfg["api_key"]:
         headers["Authorization"] = f"Bearer {request_cfg['api_key']}"
@@ -243,7 +245,7 @@ def _request_completion(messages: List[Dict[str, str]], model_key: Optional[str]
     
     response.raise_for_status()
     data = response.json()
-    return data["choices"][0]["message"]["content"].strip()
+    return (data["choices"][0]["message"].get("content") or "").strip()
 
 
 def list_available_models() -> List[Dict[str, object]]:
@@ -332,6 +334,8 @@ def generate_completion(
 
 
     # =========== STANDARD MODE (with fallbacks) ===========
+    # ollama_only is handled by model key routing via /v1/chat/completions
+    import sys
     
     # Log API key configuration at START
     logger.info("=" * 80)

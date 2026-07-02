@@ -397,6 +397,10 @@ class LLMService:
         # DeepSeek local mode never needs a Groq key
         if config.LLM_PROVIDER == 'deepseek_local':
             return True
+        if config.LLM_PROVIDER == 'ollama_only' and config.OLLAMA_ENABLED:
+            return True
+        if config.DEFAULT_MODEL_KEY.strip().lower().startswith("ollama:") and config.OLLAMA_ENABLED:
+            return True
         if not model_override:
             return False
         return model_override.strip().lower().startswith("ollama:") and config.OLLAMA_ENABLED
