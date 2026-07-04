@@ -2159,6 +2159,44 @@ def agent_modes():
     return jsonify({'modes': modes})
 
 
+@app.route('/api/agent/resume', methods=['POST'])
+@require_auth
+def agent_resume():
+    """Resume a paused agent session after the user approves/rejects a mutating tool call.
+    Body: { session_id, decision: "approve"|"reject" }
+    """
+    try:
+        data = request.json or {}
+        session_id = (data.get('session_id') or '').strip()
+        decision = (data.get('decision') or '').strip().lower()
+
+        if not session_id:
+            return jsonify({'error': 'session_id is required'}), 400
+        if decision not in ('approve', 'reject'):
+            return jsonify({'error': "decision must be 'approve' or 'reject'"}), 400
+
+        def generate():
+            try:
+                for chunk in code_agent.resume_agent_stream(session_id=session_id, decision=decision):
+                    yield chunk
+            except Exception as exc:
+                import json as _json
+                yield f"data: {_json.dumps({'type': 'error', 'content': str(exc)})}\n\n"
+
+        return Response(
+            generate(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+                'Access-Control-Allow-Origin': '*',
+            },
+        )
+    except Exception as exc:
+        logger.error(f'Agent resume error: {exc}', exc_info=True)
+        return jsonify({'error': str(exc)}), 500
+
+
 if __name__ == '__main__':
     _validate_api_configuration()
     logger.info(f"🚀 Starting server on http://localhost:{config.PORT}")
