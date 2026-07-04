@@ -127,7 +127,7 @@ export default function Login({ onLoginSuccess }) {
 
       <div className="auth-header">
         <div className="header-logo-container">
-          <img src="/src/assets/etherx-logo.png" alt="EtherX" className="header-logo-small" />
+          <img src="/src/assets/pragna-logo-full.png" alt="Pragna" className="header-logo-small" />
           <h2 className="project-name">PRAGNA-1 A</h2>
         </div>
         <p className="company-subtitle">

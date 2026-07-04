@@ -8,6 +8,7 @@ import ChatWindow from '../components/chat/ChatWindow'
 import InputBar from '../components/input/InputBar'
 import GlobalDashboard from '../components/dashboard/GlobalDashboard'
 import WorldMonitorDashboard from '../components/dashboard/WorldMonitorDashboard'
+import AgentPanel from '../components/agent/AgentPanel'
 
 const CHAT_MODE_ITEMS = [
   { id: 'general', label: 'General', description: 'Standard helpful assistant' },
@@ -339,6 +340,14 @@ function App({ onLogout, userProfile }) {
 
     if (activeView === 'intelligence') {
       return <WorldMonitorDashboard />
+    }
+
+    if (activeView === 'agent') {
+      return (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <AgentPanel />
+        </div>
+      )
     }
 
     return <HomePage onUsePrompt={sendQuickPrompt} userProfile={userProfile} />

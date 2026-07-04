@@ -1,0 +1,514 @@
+"""
+Pragna Code Agent — agentic coding assistant with a tool-use loop.
+
+The agent runs a think → tool_call → observe loop powered by the local Ollama model.
+It understands code, can read/write/create files, run shell commands, and review projects.
+
+Modes
+-----
+general       — General coding assistant
+code_review   — Deep code review: bugs, security, style, improvements
+app_builder   — Plan and build full applications step by step
+debug         — Systematic bug finding and fixing
+explain       — Explain code / concepts clearly
+refactor      — Clean up and improve existing code
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import re
+import subprocess
+import traceback
+from pathlib import Path
+from typing import Any, Generator
+
+import requests
+
+import config
+
+logger = logging.getLogger(__name__)
+
+# ─── Safety: restrict shell commands to a safe subset ──────────────────────────
+BLOCKED_SHELL_PATTERNS = [
+    r"\brm\s+-rf\b",
+    r"\brmdir\b",
+    r"\bdrop\s+database\b",
+    r"\bformat\b",
+    r"\bdel\s+/[sqa]",
+    r"\bgit\s+push\s+--force\b",
+    r"\bpoweroff\b",
+    r"\bshutdown\b",
+    r"\breboot\b",
+]
+
+# Max file size we'll read in full (bytes)
+MAX_READ_BYTES = 80_000
+# Max shell output we'll return
+MAX_SHELL_OUTPUT = 6_000
+# Max iterations in one agentic run
+MAX_AGENT_ITERS = 20
+
+AGENT_SYSTEM_PROMPTS = {
+    "general": (
+        "You are Pragna Code, an expert local AI coding assistant. "
+        "You have access to tools that let you read files, write files, create files, "
+        "run shell commands, list directories, and search code. "
+        "Use these tools autonomously to complete the user's request fully. "
+        "Think step by step. Call one tool at a time. After observing the result, decide the next action. "
+        "When the task is fully done, output a final summary starting with 'DONE:'. "
+        "Never just describe what to do — actually do it using the tools."
+    ),
+    "code_review": (
+        "You are Pragna Code in CODE REVIEW mode. "
+        "Your job is to thoroughly review code files for: bugs, security vulnerabilities, "
+        "performance issues, code style, and improvement opportunities. "
+        "Use list_dir and read_file tools to explore the codebase before reviewing. "
+        "Structure your review with sections: Bugs, Security, Performance, Style, Suggestions. "
+        "Be specific — include line numbers and code snippets where relevant. "
+        "When done, output 'DONE:' followed by a structured review report."
+    ),
+    "app_builder": (
+        "You are Pragna Code in APP BUILDER mode. "
+        "You build complete, working applications from scratch or extend existing ones. "
+        "Start by exploring the project structure, then plan the implementation, "
+        "then create/edit files one by one using your tools. "
+        "Always verify each file you create makes sense in context. "
+        "When done, output 'DONE:' followed by what was built and how to run it."
+    ),
+    "debug": (
+        "You are Pragna Code in DEBUG mode. "
+        "You systematically find and fix bugs. Start by reading relevant files, "
+        "then trace the error, identify the root cause, apply a targeted fix, "
+        "and verify the fix makes logical sense. "
+        "Explain your reasoning at each step. "
+        "When done, output 'DONE:' followed by what was fixed and why."
+    ),
+    "explain": (
+        "You are Pragna Code in EXPLAIN mode. "
+        "You explain code clearly and thoroughly — what it does, how it works, "
+        "and why it's written that way. Read the relevant files using your tools. "
+        "Use clear language, examples, and analogies where helpful. "
+        "When done, output 'DONE:' followed by the full explanation."
+    ),
+    "refactor": (
+        "You are Pragna Code in REFACTOR mode. "
+        "You improve existing code: better structure, cleaner logic, reduced duplication, "
+        "better naming, improved readability — without changing behavior. "
+        "Read the files first, plan the refactoring, then apply changes using write_file. "
+        "When done, output 'DONE:' followed by what was refactored and how."
+    ),
+}
+
+# ─── Tool definitions ────────────────────────────────────────────────────────
+
+TOOLS = [
+    {
+        "name": "read_file",
+        "description": "Read the contents of a file. Returns the file content as text.",
+        "parameters": {
+            "path": "string — path to the file (relative to project root or absolute)"
+        },
+    },
+    {
+        "name": "write_file",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does.",
+        "parameters": {
+            "path": "string — file path",
+            "content": "string — full file content to write",
+        },
+    },
+    {
+        "name": "create_file",
+        "description": "Create a new file with given content. Fails if file already exists.",
+        "parameters": {
+            "path": "string — file path",
+            "content": "string — initial file content",
+        },
+    },
+    {
+        "name": "list_dir",
+        "description": "List files and directories at a given path.",
+        "parameters": {
+            "path": "string — directory path (use '.' for current directory)"
+        },
+    },
+    {
+        "name": "run_command",
+        "description": (
+            "Run a shell command and return stdout + stderr. "
+            "Use for: running scripts, installing packages, running tests, git commands. "
+            "Keep commands safe and non-destructive."
+        ),
+        "parameters": {
+            "command": "string — the shell command to run",
+            "cwd": "string — optional working directory",
+        },
+    },
+    {
+        "name": "search_code",
+        "description": "Search for a text pattern across all files in a directory (recursive grep).",
+        "parameters": {
+            "pattern": "string — text or regex to search for",
+            "path": "string — directory to search in (default: '.')",
+            "file_pattern": "string — optional glob to filter files, e.g. '*.py'",
+        },
+    },
+    {
+        "name": "append_file",
+        "description": "Append text to the end of an existing file.",
+        "parameters": {
+            "path": "string — file path",
+            "content": "string — content to append",
+        },
+    },
+]
+
+TOOLS_DESCRIPTION = "\n".join(
+    f"- {t['name']}({', '.join(t['parameters'].keys())}): {t['description']}"
+    for t in TOOLS
+)
+
+TOOL_CALL_FORMAT = """
+To call a tool, output EXACTLY this JSON block (nothing else on that line):
+<tool_call>
+{"tool": "tool_name", "args": {"param1": "value1"}}
+</tool_call>
+
+Available tools:
+""" + TOOLS_DESCRIPTION
+
+
+# ─── Tool execution ──────────────────────────────────────────────────────────
+
+def _safe_path(path: str) -> Path:
+    """Resolve path, keeping it within reasonable bounds."""
+    p = Path(path).expanduser()
+    return p
+
+
+def _is_blocked_command(cmd: str) -> bool:
+    for pattern in BLOCKED_SHELL_PATTERNS:
+        if re.search(pattern, cmd, re.IGNORECASE):
+            return True
+    return False
+
+
+def tool_read_file(path: str) -> str:
+    try:
+        p = _safe_path(path)
+        if not p.exists():
+            return f"ERROR: File not found: {path}"
+        if p.stat().st_size > MAX_READ_BYTES:
+            with open(p, "r", errors="replace") as f:
+                content = f.read(MAX_READ_BYTES)
+            return content + f"\n\n[... truncated at {MAX_READ_BYTES} bytes ...]"
+        with open(p, "r", errors="replace") as f:
+            return f.read()
+    except Exception as e:
+        return f"ERROR reading file: {e}"
+
+
+def tool_write_file(path: str, content: str) -> str:
+    try:
+        p = _safe_path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"OK: Written {len(content)} chars to {path}"
+    except Exception as e:
+        return f"ERROR writing file: {e}"
+
+
+def tool_create_file(path: str, content: str) -> str:
+    try:
+        p = _safe_path(path)
+        if p.exists():
+            return f"ERROR: File already exists: {path}. Use write_file to overwrite."
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"OK: Created {path} ({len(content)} chars)"
+    except Exception as e:
+        return f"ERROR creating file: {e}"
+
+
+def tool_list_dir(path: str) -> str:
+    try:
+        p = _safe_path(path)
+        if not p.exists():
+            return f"ERROR: Path not found: {path}"
+        if not p.is_dir():
+            return f"ERROR: Not a directory: {path}"
+        entries = []
+        for item in sorted(p.iterdir()):
+            if item.name.startswith("."):
+                continue
+            if item.is_dir():
+                entries.append(f"[DIR]  {item.name}/")
+            else:
+                size = item.stat().st_size
+                entries.append(f"[FILE] {item.name} ({size} bytes)")
+        return "\n".join(entries) if entries else "(empty directory)"
+    except Exception as e:
+        return f"ERROR listing dir: {e}"
+
+
+def tool_run_command(command: str, cwd: str = None) -> str:
+    if _is_blocked_command(command):
+        return f"ERROR: Blocked command — this command pattern is not allowed for safety: {command}"
+    try:
+        cwd_path = _safe_path(cwd) if cwd else None
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=cwd_path,
+        )
+        output = ""
+        if result.stdout:
+            output += result.stdout
+        if result.stderr:
+            output += "\n[STDERR]\n" + result.stderr
+        if not output.strip():
+            output = f"(exit code {result.returncode}, no output)"
+        if len(output) > MAX_SHELL_OUTPUT:
+            output = output[:MAX_SHELL_OUTPUT] + "\n[... truncated ...]"
+        return output
+    except subprocess.TimeoutExpired:
+        return "ERROR: Command timed out after 30 seconds."
+    except Exception as e:
+        return f"ERROR running command: {e}"
+
+
+def tool_search_code(pattern: str, path: str = ".", file_pattern: str = None) -> str:
+    try:
+        p = _safe_path(path)
+        cmd = ["grep", "-rn", "--include", file_pattern or "*", pattern, str(p)]
+        # On Windows use findstr as fallback
+        if os.name == "nt":
+            if file_pattern:
+                cmd = f'findstr /s /n /r "{pattern}" "{p}\\{file_pattern}"'
+            else:
+                cmd = f'findstr /s /n /r "{pattern}" "{p}\\*"'
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+        else:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+
+        output = result.stdout or "(no matches found)"
+        if len(output) > MAX_SHELL_OUTPUT:
+            output = output[:MAX_SHELL_OUTPUT] + "\n[... truncated ...]"
+        return output
+    except Exception as e:
+        return f"ERROR searching: {e}"
+
+
+def tool_append_file(path: str, content: str) -> str:
+    try:
+        p = _safe_path(path)
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(content)
+        return f"OK: Appended {len(content)} chars to {path}"
+    except Exception as e:
+        return f"ERROR appending to file: {e}"
+
+
+def dispatch_tool(tool_name: str, args: dict) -> str:
+    """Route a tool call to the right function."""
+    try:
+        if tool_name == "read_file":
+            return tool_read_file(args.get("path", ""))
+        elif tool_name == "write_file":
+            return tool_write_file(args.get("path", ""), args.get("content", ""))
+        elif tool_name == "create_file":
+            return tool_create_file(args.get("path", ""), args.get("content", ""))
+        elif tool_name == "list_dir":
+            return tool_list_dir(args.get("path", "."))
+        elif tool_name == "run_command":
+            return tool_run_command(args.get("command", ""), args.get("cwd"))
+        elif tool_name == "search_code":
+            return tool_search_code(
+                args.get("pattern", ""),
+                args.get("path", "."),
+                args.get("file_pattern"),
+            )
+        elif tool_name == "append_file":
+            return tool_append_file(args.get("path", ""), args.get("content", ""))
+        else:
+            return f"ERROR: Unknown tool '{tool_name}'"
+    except Exception as e:
+        return f"ERROR in tool {tool_name}: {traceback.format_exc()}"
+
+
+# ─── Ollama LLM call ─────────────────────────────────────────────────────────
+
+def _call_ollama(messages: list, stream: bool = False):
+    """Call Ollama /api/chat endpoint."""
+    url = f"{config.OLLAMA_API_URL.rstrip('/')}/api/chat"
+    model = config.OLLAMA_MODEL
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": stream,
+        "options": {
+            "temperature": 0.3,
+            "num_ctx": 8192,
+        },
+    }
+    resp = requests.post(url, json=payload, timeout=120, stream=stream)
+    resp.raise_for_status()
+    return resp
+
+
+def _extract_tool_call(text: str):
+    """Extract a tool_call JSON block from the model output."""
+    match = re.search(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", text, re.DOTALL)
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(1))
+        if "tool" in data and "args" in data:
+            return data
+    except json.JSONDecodeError:
+        pass
+    return None
+
+
+# ─── Main agentic loop (streaming generator) ─────────────────────────────────
+
+def run_agent_stream(
+    task: str,
+    mode: str = "general",
+    context_files: list = None,
+    working_dir: str = None,
+) -> Generator[str, None, None]:
+    """
+    Run the agentic loop and yield SSE-formatted events.
+
+    Event types:
+      data: {"type": "thought", "content": "..."}
+      data: {"type": "tool_call", "tool": "...", "args": {...}}
+      data: {"type": "tool_result", "tool": "...", "content": "..."}
+      data: {"type": "done", "content": "..."}
+      data: {"type": "error", "content": "..."}
+    """
+    system_prompt = AGENT_SYSTEM_PROMPTS.get(mode, AGENT_SYSTEM_PROMPTS["general"])
+
+    full_system = (
+        system_prompt
+        + "\n\n"
+        + TOOL_CALL_FORMAT
+        + "\n\nIMPORTANT: Each message you send should contain at most ONE <tool_call> block. "
+        "After receiving the tool result, continue thinking and either call another tool or produce your final answer. "
+        "Do NOT make up tool results — wait for the actual result."
+    )
+
+    if working_dir:
+        full_system += f"\n\nWorking directory context: {working_dir}"
+
+    messages = [{"role": "system", "content": full_system}]
+
+    # Inject any pre-loaded file context
+    if context_files:
+        ctx_parts = []
+        for cf in context_files:
+            content = tool_read_file(cf)
+            ctx_parts.append(f"### File: {cf}\n```\n{content}\n```")
+        messages.append({
+            "role": "user",
+            "content": "Here are relevant files for context:\n\n" + "\n\n".join(ctx_parts)
+        })
+        messages.append({"role": "assistant", "content": "I have read the context files. Ready to proceed."})
+
+    messages.append({"role": "user", "content": task})
+
+    iteration = 0
+
+    while iteration < MAX_AGENT_ITERS:
+        iteration += 1
+
+        # ── Call Ollama (non-streaming for cleaner tool parsing) ──
+        try:
+            resp = _call_ollama(messages, stream=False)
+            resp_data = resp.json()
+            assistant_text = resp_data.get("message", {}).get("content", "").strip()
+        except Exception as e:
+            yield _sse({"type": "error", "content": f"Ollama error: {e}"})
+            return
+
+        if not assistant_text:
+            yield _sse({"type": "error", "content": "Empty response from model."})
+            return
+
+        # ── Check for tool call ──
+        tool_call = _extract_tool_call(assistant_text)
+
+        # Emit the thought (strip the tool_call block for cleaner display)
+        thought_text = re.sub(r"<tool_call>.*?</tool_call>", "", assistant_text, flags=re.DOTALL).strip()
+        if thought_text:
+            yield _sse({"type": "thought", "content": thought_text})
+
+        if tool_call:
+            tool_name = tool_call["tool"]
+            tool_args = tool_call["args"]
+
+            yield _sse({"type": "tool_call", "tool": tool_name, "args": tool_args})
+
+            # Execute the tool
+            result = dispatch_tool(tool_name, tool_args)
+            result_preview = result[:500] + "..." if len(result) > 500 else result
+
+            yield _sse({"type": "tool_result", "tool": tool_name, "content": result_preview})
+
+            # Feed result back into conversation
+            messages.append({"role": "assistant", "content": assistant_text})
+            messages.append({
+                "role": "user",
+                "content": f"<tool_result>\n{result}\n</tool_result>\n\nContinue with the next step."
+            })
+
+        else:
+            # No tool call — model gave a final answer
+            # Check if it signals completion
+            if "DONE:" in assistant_text or iteration >= MAX_AGENT_ITERS:
+                done_text = assistant_text.replace("DONE:", "").strip() if "DONE:" in assistant_text else assistant_text
+                yield _sse({"type": "done", "content": done_text})
+                return
+            else:
+                # Model gave partial answer — push it back and ask to continue
+                messages.append({"role": "assistant", "content": assistant_text})
+                messages.append({
+                    "role": "user",
+                    "content": "Continue. If there are more steps, do them now. If fully done, output 'DONE:' followed by your summary."
+                })
+
+    yield _sse({"type": "done", "content": "Agent reached maximum iteration limit. Task may be partially complete."})
+
+
+def _sse(data: dict) -> str:
+    return f"data: {json.dumps(data)}\n\n"
+
+
+# ─── Non-streaming single-shot chat (for simpler UI calls) ────────────────────
+
+def agent_chat(task: str, mode: str = "general", history: list = None) -> dict:
+    """Simple non-streaming agent response for quick queries."""
+    system_prompt = AGENT_SYSTEM_PROMPTS.get(mode, AGENT_SYSTEM_PROMPTS["general"])
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if history:
+        for turn in history[-6:]:  # last 6 turns
+            messages.append({"role": turn.get("role", "user"), "content": turn.get("content", "")})
+
+    messages.append({"role": "user", "content": task})
+
+    try:
+        resp = _call_ollama(messages, stream=False)
+        resp_data = resp.json()
+        content = resp_data.get("message", {}).get("content", "").strip()
+        return {"response": content, "mode": mode}
+    except Exception as e:
+        return {"response": f"Agent error: {e}", "mode": mode}

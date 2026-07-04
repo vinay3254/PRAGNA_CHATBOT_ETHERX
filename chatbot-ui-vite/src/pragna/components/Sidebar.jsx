@@ -7,12 +7,13 @@ import {
   LayoutGrid, 
   Settings,
   Zap,
-  Globe
+  Globe,
+  Terminal
 } from 'lucide-react'
 import NavItem from './NavItem'
 import RecentItem from './RecentItem'
 import ChatManagementAPI from '../../api/chatManagement'
-import etherxLogo from '../../assets/etherx-logo.png'
+import pragnaLogo from '../../assets/pragna-logo-full.png'
 
 const Sidebar = ({
   activeView,
@@ -161,7 +162,7 @@ const Sidebar = ({
       {/* Header */}
       <div className="p-5 pb-2">
         <div className="flex items-center gap-2 mb-6">
-          <img src={etherxLogo} alt="EtherX" className="header-logo-small" />
+          <img src={pragnaLogo} alt="Pragna" className="header-logo-small" />
           <span className="project-name">PRAGNA I-A</span>
         </div>
         
@@ -183,6 +184,7 @@ const Sidebar = ({
           <NavItem icon={LayoutGrid} label="Projects" active={activeView === 'projects'} onClick={() => handleChangeView('projects')} />
           <NavItem icon={Zap} label="GPTs" active={activeView === 'gpts'} onClick={() => handleChangeView('gpts')} />
           <NavItem icon={Globe} label="Intelligence" active={activeView === 'intelligence'} onClick={() => handleChangeView('intelligence')} />
+          <NavItem icon={Terminal} label="Agent" active={activeView === 'agent'} onClick={() => handleChangeView('agent')} />
         </div>
 
         <div className="mt-8">

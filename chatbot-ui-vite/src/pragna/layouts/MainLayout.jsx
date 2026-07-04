@@ -3,7 +3,7 @@ import { Menu } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { motion, AnimatePresence } from 'framer-motion'
-import etherxLogo from '../../assets/etherx-logo.png'
+import pragnaLogo from '../../assets/pragna-logo-full.png'
 
 const MainLayout = ({
   children,
@@ -86,7 +86,7 @@ const MainLayout = ({
               <Menu size={20} className="text-gray-600" />
             </button>
             <div className="flex items-center gap-2">
-              <img src={etherxLogo} alt="EtherX" className="header-logo-small" />
+              <img src={pragnaLogo} alt="Pragna" className="header-logo-small" />
               <span className="project-name">PRAGNA I-A</span>
             </div>
             <div className="w-8" />
