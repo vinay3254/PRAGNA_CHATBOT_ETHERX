@@ -11,6 +11,7 @@ Usage:
 
 import sys
 import os
+import difflib
 import json
 import re
 import subprocess
@@ -243,6 +244,45 @@ BLOCKED = [
 
 def _is_blocked(cmd: str) -> bool:
     return any(re.search(p, cmd, re.IGNORECASE) for p in BLOCKED)
+
+MUTATING_TOOLS = {"write_file", "create_file", "append_file", "run_command"}
+
+
+def _preview_for(tool_name: str, args: dict) -> str:
+    """Build a human-readable preview (diff or command) for a mutating tool call."""
+    if tool_name == "run_command":
+        return f"$ {args.get('command', '')}"
+
+    path = args.get("path", "")
+    new_content = args.get("content", "")
+    try:
+        p = Path(path)
+        old_content = p.read_text(errors="replace") if p.exists() else ""
+    except Exception:
+        old_content = ""
+
+    if tool_name == "append_file":
+        new_content = old_content + new_content
+
+    diff = difflib.unified_diff(
+        old_content.splitlines(keepends=True),
+        new_content.splitlines(keepends=True),
+        fromfile=f"a/{path}",
+        tofile=f"b/{path}",
+    )
+    diff_text = "".join(diff)
+    return diff_text or f"(no textual diff — {path} unchanged or binary)"
+
+
+def _confirm_action(tool_name: str, args: dict) -> bool:
+    """Show a diff/command preview and block on a y/N prompt before a mutating tool runs."""
+    preview = _preview_for(tool_name, args)
+    print(f"  {C.GOLD_DEEP}┌─ approval required: {tool_name}{C.RESET}")
+    for line in preview.splitlines()[:40]:
+        print(f"  {C.GOLD_DEEP}│{C.RESET} {line}")
+    print(f"  {C.GOLD_DEEP}└─{C.RESET}")
+    answer = input(f"  Approve this action? [y/N] ").strip().lower()
+    return answer == "y"
 
 MAX_READ   = 80_000
 MAX_OUTPUT = 6_000
@@ -499,12 +539,15 @@ def run_agent(session: Session, task: str):
             tool_args = tool_call["args"]
             print_tool_call(tool_name, tool_args)
 
-            if tool_name == "run_command":
-                spinner.label = f"Running: {tool_args.get('command', '')[:40]}"
-                spinner.start()
-            result = dispatch_tool(tool_name, tool_args)
-            if tool_name == "run_command":
-                spinner.stop()
+            if tool_name in MUTATING_TOOLS and not _confirm_action(tool_name, tool_args):
+                result = "User rejected this action. Do not repeat it; try a different approach or ask for clarification."
+            else:
+                if tool_name == "run_command":
+                    spinner.label = f"Running: {tool_args.get('command', '')[:40]}"
+                    spinner.start()
+                result = dispatch_tool(tool_name, tool_args)
+                if tool_name == "run_command":
+                    spinner.stop()
 
             print_tool_result(tool_name, result)
 
