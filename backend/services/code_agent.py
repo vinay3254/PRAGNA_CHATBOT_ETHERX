@@ -463,7 +463,7 @@ SESSION_TTL_SECONDS = 30 * 60
 
 def _prune_expired_sessions() -> None:
     now = time.time()
-    expired = [sid for sid, s in AGENT_SESSIONS.items() if now - s["created"] > SESSION_TTL_SECONDS]
+    expired = [sid for sid, s in list(AGENT_SESSIONS.items()) if now - s["created"] > SESSION_TTL_SECONDS]
     for sid in expired:
         AGENT_SESSIONS.pop(sid, None)
 
