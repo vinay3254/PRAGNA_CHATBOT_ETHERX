@@ -245,6 +245,7 @@ BLOCKED = [
 def _is_blocked(cmd: str) -> bool:
     return any(re.search(p, cmd, re.IGNORECASE) for p in BLOCKED)
 
+# Note: run_command is not path-sandboxed like the file tools above; it relies entirely on the approval gate + blocklist.
 MUTATING_TOOLS = {"write_file", "create_file", "append_file", "run_command"}
 
 
@@ -659,6 +660,7 @@ def main():
         sys.exit(1)
 
     session = Session(str(p))
+    os.chdir(session.cwd)
     context_files = []
 
     print_header(session)
@@ -724,6 +726,7 @@ def main():
                 p = Path(session.cwd) / p
             if p.is_dir():
                 session.cwd = str(p.resolve())
+                os.chdir(session.cwd)
                 session.reset_messages(context_files=context_files)
                 print_info(f"Working directory: {session.cwd}")
             else:

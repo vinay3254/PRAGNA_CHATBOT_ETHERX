@@ -383,6 +383,7 @@ def dispatch_tool(tool_name: str, args: dict, root: Path) -> str:
 # ─── Tool classification (auto-run vs. requires approval) ────────────────────
 
 AUTO_TOOLS = {"read_file", "list_dir", "search_code"}
+# Note: run_command is not path-sandboxed like the file tools above; it relies entirely on the approval gate.
 MUTATING_TOOLS = {"write_file", "create_file", "append_file", "run_command"}
 
 
