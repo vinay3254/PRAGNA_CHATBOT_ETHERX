@@ -15,6 +15,7 @@ refactor      — Clean up and improve existing code
 """
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import os
@@ -375,6 +376,41 @@ def dispatch_tool(tool_name: str, args: dict, root: Path) -> str:
             return f"ERROR: Unknown tool '{tool_name}'"
     except Exception as e:
         return f"ERROR in tool {tool_name}: {traceback.format_exc()}"
+
+
+# ─── Tool classification (auto-run vs. requires approval) ────────────────────
+
+AUTO_TOOLS = {"read_file", "list_dir", "search_code"}
+MUTATING_TOOLS = {"write_file", "create_file", "append_file", "run_command"}
+
+
+def build_preview(tool_name: str, args: dict, root: Path) -> str:
+    """Build a human-readable preview (diff or command) for a mutating tool call."""
+    if tool_name == "run_command":
+        cmd = args.get("command", "")
+        cwd = args.get("cwd") or "(working directory)"
+        return f"$ {cmd}\n(cwd: {cwd})"
+
+    path = args.get("path", "")
+    new_content = args.get("content", "")
+
+    try:
+        p = _resolve_in_root(root, path)
+        old_content = p.read_text(errors="replace") if p.exists() else ""
+    except (ValueError, OSError):
+        old_content = ""
+
+    if tool_name == "append_file":
+        new_content = old_content + new_content
+
+    diff = difflib.unified_diff(
+        old_content.splitlines(keepends=True),
+        new_content.splitlines(keepends=True),
+        fromfile=f"a/{path}",
+        tofile=f"b/{path}",
+    )
+    diff_text = "".join(diff)
+    return diff_text or f"(no textual diff — {path} unchanged or binary)"
 
 
 # ─── Ollama LLM call ─────────────────────────────────────────────────────────
