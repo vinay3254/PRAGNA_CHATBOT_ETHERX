@@ -21,7 +21,9 @@ import logging
 import os
 import re
 import subprocess
+import time
 import traceback
+import uuid
 from pathlib import Path
 from typing import Any, Generator
 
@@ -449,6 +451,36 @@ def _extract_tool_call(text: str):
 
 # ─── Main agentic loop (streaming generator) ─────────────────────────────────
 
+def _sse(data: dict) -> str:
+    return f"data: {json.dumps(data)}\n\n"
+
+
+# ─── Session store for pausable agent runs ───────────────────────────────────
+
+AGENT_SESSIONS: dict[str, dict] = {}
+SESSION_TTL_SECONDS = 30 * 60
+
+
+def _prune_expired_sessions() -> None:
+    now = time.time()
+    expired = [sid for sid, s in AGENT_SESSIONS.items() if now - s["created"] > SESSION_TTL_SECONDS]
+    for sid in expired:
+        AGENT_SESSIONS.pop(sid, None)
+
+
+def _new_session(messages: list, root: Path, mode: str) -> str:
+    _prune_expired_sessions()
+    session_id = uuid.uuid4().hex
+    AGENT_SESSIONS[session_id] = {
+        "messages": messages,
+        "root": root,
+        "mode": mode,
+        "iteration": 0,
+        "created": time.time(),
+    }
+    return session_id
+
+
 def run_agent_stream(
     task: str,
     mode: str = "general",
@@ -456,15 +488,18 @@ def run_agent_stream(
     working_dir: str = None,
 ) -> Generator[str, None, None]:
     """
-    Run the agentic loop and yield SSE-formatted events.
+    Start a new agentic run and yield SSE-formatted events until the model
+    finishes or hits a mutating tool call that needs user approval.
 
     Event types:
       data: {"type": "thought", "content": "..."}
       data: {"type": "tool_call", "tool": "...", "args": {...}}
       data: {"type": "tool_result", "tool": "...", "content": "..."}
+      data: {"type": "confirm_required", "session_id": "...", "tool": "...", "args": {...}, "preview": "..."}
       data: {"type": "done", "content": "..."}
       data: {"type": "error", "content": "..."}
     """
+    root = Path(working_dir).resolve() if working_dir else DEFAULT_ROOT
     system_prompt = AGENT_SYSTEM_PROMPTS.get(mode, AGENT_SYSTEM_PROMPTS["general"])
 
     full_system = (
@@ -481,11 +516,10 @@ def run_agent_stream(
 
     messages = [{"role": "system", "content": full_system}]
 
-    # Inject any pre-loaded file context
     if context_files:
         ctx_parts = []
         for cf in context_files:
-            content = tool_read_file(cf)
+            content = tool_read_file(root, cf)
             ctx_parts.append(f"### File: {cf}\n```\n{content}\n```")
         messages.append({
             "role": "user",
@@ -495,28 +529,74 @@ def run_agent_stream(
 
     messages.append({"role": "user", "content": task})
 
-    iteration = 0
+    session_id = _new_session(messages, root, mode)
+    yield from _agent_loop(session_id)
 
-    while iteration < MAX_AGENT_ITERS:
-        iteration += 1
 
-        # ── Call Ollama (non-streaming for cleaner tool parsing) ──
+def resume_agent_stream(session_id: str, decision: str) -> Generator[str, None, None]:
+    """
+    Resume a paused session after the user approves or rejects the pending
+    mutating tool call, then continue the loop.
+    """
+    session = AGENT_SESSIONS.get(session_id)
+    if not session:
+        yield _sse({"type": "error", "content": "Unknown or expired session."})
+        return
+
+    pending = session.pop("pending_tool_call", None)
+    if not pending:
+        yield _sse({"type": "error", "content": "No pending action to resume."})
+        return
+
+    tool_name = pending["tool"]
+    tool_args = pending["args"]
+
+    if decision == "approve":
+        result = dispatch_tool(tool_name, tool_args, session["root"])
+    else:
+        result = "User rejected this action. Do not repeat it; try a different approach or ask for clarification."
+
+    result_preview = result[:500] + "..." if len(result) > 500 else result
+    yield _sse({"type": "tool_result", "tool": tool_name, "content": result_preview})
+
+    session["messages"].append({"role": "assistant", "content": pending["assistant_text"]})
+    session["messages"].append({
+        "role": "user",
+        "content": f"<tool_result>\n{result}\n</tool_result>\n\nContinue with the next step."
+    })
+
+    yield from _agent_loop(session_id)
+
+
+def _agent_loop(session_id: str) -> Generator[str, None, None]:
+    """Shared think -> tool -> observe loop, used by both a fresh run and a resume."""
+    session = AGENT_SESSIONS.get(session_id)
+    if not session:
+        yield _sse({"type": "error", "content": "Unknown or expired session."})
+        return
+
+    messages = session["messages"]
+    root = session["root"]
+
+    while session["iteration"] < MAX_AGENT_ITERS:
+        session["iteration"] += 1
+
         try:
             resp = _call_ollama(messages, stream=False)
             resp_data = resp.json()
             assistant_text = resp_data.get("message", {}).get("content", "").strip()
         except Exception as e:
             yield _sse({"type": "error", "content": f"Ollama error: {e}"})
+            AGENT_SESSIONS.pop(session_id, None)
             return
 
         if not assistant_text:
             yield _sse({"type": "error", "content": "Empty response from model."})
+            AGENT_SESSIONS.pop(session_id, None)
             return
 
-        # ── Check for tool call ──
         tool_call = _extract_tool_call(assistant_text)
 
-        # Emit the thought (strip the tool_call block for cleaner display)
         thought_text = re.sub(r"<tool_call>.*?</tool_call>", "", assistant_text, flags=re.DOTALL).strip()
         if thought_text:
             yield _sse({"type": "thought", "content": thought_text})
@@ -525,15 +605,28 @@ def run_agent_stream(
             tool_name = tool_call["tool"]
             tool_args = tool_call["args"]
 
+            if tool_name in MUTATING_TOOLS:
+                preview = build_preview(tool_name, tool_args, root)
+                session["pending_tool_call"] = {
+                    "tool": tool_name,
+                    "args": tool_args,
+                    "assistant_text": assistant_text,
+                }
+                yield _sse({
+                    "type": "confirm_required",
+                    "session_id": session_id,
+                    "tool": tool_name,
+                    "args": tool_args,
+                    "preview": preview,
+                })
+                return
+
             yield _sse({"type": "tool_call", "tool": tool_name, "args": tool_args})
 
-            # Execute the tool
-            result = dispatch_tool(tool_name, tool_args)
+            result = dispatch_tool(tool_name, tool_args, root)
             result_preview = result[:500] + "..." if len(result) > 500 else result
-
             yield _sse({"type": "tool_result", "tool": tool_name, "content": result_preview})
 
-            # Feed result back into conversation
             messages.append({"role": "assistant", "content": assistant_text})
             messages.append({
                 "role": "user",
@@ -541,14 +634,12 @@ def run_agent_stream(
             })
 
         else:
-            # No tool call — model gave a final answer
-            # Check if it signals completion
-            if "DONE:" in assistant_text or iteration >= MAX_AGENT_ITERS:
+            if "DONE:" in assistant_text or session["iteration"] >= MAX_AGENT_ITERS:
                 done_text = assistant_text.replace("DONE:", "").strip() if "DONE:" in assistant_text else assistant_text
                 yield _sse({"type": "done", "content": done_text})
+                AGENT_SESSIONS.pop(session_id, None)
                 return
             else:
-                # Model gave partial answer — push it back and ask to continue
                 messages.append({"role": "assistant", "content": assistant_text})
                 messages.append({
                     "role": "user",
@@ -556,10 +647,7 @@ def run_agent_stream(
                 })
 
     yield _sse({"type": "done", "content": "Agent reached maximum iteration limit. Task may be partially complete."})
-
-
-def _sse(data: dict) -> str:
-    return f"data: {json.dumps(data)}\n\n"
+    AGENT_SESSIONS.pop(session_id, None)
 
 
 # ─── Non-streaming single-shot chat (for simpler UI calls) ────────────────────
