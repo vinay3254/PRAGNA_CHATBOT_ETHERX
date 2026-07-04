@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { runAgentStream } from '../../api/api'
+import { runAgentStream, resumeAgentStream } from '../../api/api'
 
 const MODES = [
   { id: 'general',     label: 'General',     icon: '🤖', desc: 'General coding assistant' },
@@ -14,6 +14,7 @@ const EVENT_COLORS = {
   thought:     { bg: '#1a2035', border: '#3b4fd8', label: '💭 Thinking', labelColor: '#818cf8' },
   tool_call:   { bg: '#0d1f18', border: '#059669', label: '🔧 Tool Call', labelColor: '#34d399' },
   tool_result: { bg: '#1a1505', border: '#d97706', label: '📤 Result',   labelColor: '#fbbf24' },
+  confirm_required: { bg: '#1f1a05', border: '#d97706', label: '⚠️ Approval needed', labelColor: '#fbbf24' },
   done:        { bg: '#0d1f18', border: '#10b981', label: '✅ Done',      labelColor: '#6ee7b7' },
   error:       { bg: '#1f0d0d', border: '#ef4444', label: '❌ Error',     labelColor: '#fca5a5' },
 }
@@ -74,9 +75,70 @@ function ToolResultCard({ event }) {
   )
 }
 
-function EventBlock({ event }) {
+function ConfirmCard({ event, onDecision }) {
+  const cfg = EVENT_COLORS.confirm_required
+
+  return (
+    <div style={{
+      background: cfg.bg,
+      border: `1px solid ${cfg.border}`,
+      borderRadius: 10,
+      padding: '10px 14px',
+      margin: '6px 0',
+    }}>
+      <div style={{ color: cfg.labelColor, fontWeight: 700, fontSize: 12, marginBottom: 6 }}>
+        {cfg.label}: {event.tool}
+      </div>
+      <pre style={{
+        margin: '0 0 10px',
+        color: '#cbd5e1',
+        fontSize: 12,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-all',
+        fontFamily: 'monospace',
+        maxHeight: 240,
+        overflowY: 'auto',
+      }}>
+        {event.preview}
+      </pre>
+      {event.resolved ? (
+        <div style={{
+          color: event.resolved === 'approved' ? '#6ee7b7' : '#fca5a5',
+          fontSize: 12,
+          fontWeight: 700,
+        }}>
+          {event.resolved === 'approved' ? '✓ Approved' : '✗ Rejected'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => onDecision(event, 'approve')}
+            style={{
+              padding: '6px 14px', borderRadius: 8, border: '1px solid #059669',
+              background: '#0d1f18', color: '#34d399', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            ✓ Approve
+          </button>
+          <button
+            onClick={() => onDecision(event, 'reject')}
+            style={{
+              padding: '6px 14px', borderRadius: 8, border: '1px solid #ef4444',
+              background: '#1f0d0d', color: '#fca5a5', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            ✗ Reject
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EventBlock({ event, onDecision }) {
   if (event.type === 'tool_call') return <ToolCallCard event={event} />
   if (event.type === 'tool_result') return <ToolResultCard event={event} />
+  if (event.type === 'confirm_required') return <ConfirmCard event={event} onDecision={onDecision} />
 
   const cfg = EVENT_COLORS[event.type] || EVENT_COLORS.thought
 
@@ -148,12 +210,30 @@ export default function AgentPanel() {
       contextFiles: files,
       onEvent: (event) => {
         setEvents(prev => [...prev, event])
-        if (event.type === 'done' || event.type === 'error') {
+        if (event.type === 'done' || event.type === 'error' || event.type === 'confirm_required') {
           setIsRunning(false)
         }
       },
     })
   }, [task, selectedMode, contextFiles, isRunning])
+
+  const handleDecision = useCallback((event, decision) => {
+    setEvents(prev => prev.map(e => (
+      e === event ? { ...e, resolved: decision === 'approve' ? 'approved' : 'rejected' } : e
+    )))
+    setIsRunning(true)
+
+    controllerRef.current = resumeAgentStream({
+      sessionId: event.session_id,
+      decision,
+      onEvent: (ev) => {
+        setEvents(prev => [...prev, ev])
+        if (ev.type === 'done' || ev.type === 'error' || ev.type === 'confirm_required') {
+          setIsRunning(false)
+        }
+      },
+    })
+  }, [])
 
   const handleStop = () => {
     controllerRef.current?.abort()
@@ -260,7 +340,7 @@ export default function AgentPanel() {
           </div>
         )}
         {events.map((event, i) => (
-          <EventBlock key={i} event={event} />
+          <EventBlock key={i} event={event} onDecision={handleDecision} />
         ))}
         {isRunning && <ThinkingDots />}
         <div ref={bottomRef} />
