@@ -26,6 +26,7 @@ from services import vision_service
 from auth import auth_service, require_auth
 from database import db
 from chat_management_api import chat_management_bp
+from services import code_agent
 
 # Configure logging
 logging.basicConfig(
@@ -2071,6 +2072,92 @@ def _validate_api_configuration():
         logger.warning("  2. Get a valid API key from https://console.groq.com")
         logger.warning("  3. Update GROQ_API_KEY=your_key_here")
         logger.warning("  4. Restart the server\n")
+
+
+# ─── Pragna Code Agent Routes ─────────────────────────────────────────────────
+
+@app.route('/api/agent/run', methods=['POST'])
+@require_auth
+def agent_run():
+    """Streaming agentic loop endpoint (SSE).
+    Body: { task, mode, context_files, working_dir }
+    """
+    try:
+        data = request.json or {}
+        task = (data.get('task') or '').strip()
+        mode = (data.get('mode') or 'general').strip().lower()
+        context_files = data.get('context_files') or []
+        working_dir = data.get('working_dir') or None
+
+        if not task:
+            return jsonify({'error': 'task is required'}), 400
+
+        if mode not in code_agent.AGENT_SYSTEM_PROMPTS:
+            mode = 'general'
+
+        def generate():
+            try:
+                for chunk in code_agent.run_agent_stream(
+                    task=task,
+                    mode=mode,
+                    context_files=context_files,
+                    working_dir=working_dir,
+                ):
+                    yield chunk
+            except Exception as exc:
+                import json as _json
+                yield f"data: {_json.dumps({'type': 'error', 'content': str(exc)})}\n\n"
+
+        return Response(
+            generate(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+                'Access-Control-Allow-Origin': '*',
+            },
+        )
+    except Exception as exc:
+        logger.error(f'Agent run error: {exc}', exc_info=True)
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/agent/chat', methods=['POST'])
+@require_auth
+def agent_chat():
+    """Non-streaming single-turn agent response.
+    Body: { task, mode, history }
+    """
+    try:
+        data = request.json or {}
+        task = (data.get('task') or '').strip()
+        mode = (data.get('mode') or 'general').strip().lower()
+        history = data.get('history') or []
+
+        if not task:
+            return jsonify({'error': 'task is required'}), 400
+
+        result = code_agent.agent_chat(task=task, mode=mode, history=history)
+        return jsonify(result)
+    except Exception as exc:
+        logger.error(f'Agent chat error: {exc}', exc_info=True)
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/agent/modes', methods=['GET'])
+@require_auth
+def agent_modes():
+    """Return available agent modes and their descriptions."""
+    modes = [
+        {'id': 'general',     'label': 'General',     'icon': '🤖', 'desc': 'General coding assistant'},
+        {'id': 'code_review', 'label': 'Code Review',  'icon': '🔍', 'desc': 'Deep code review: bugs, security, style'},
+        {'id': 'app_builder', 'label': 'App Builder',  'icon': '🏗️', 'desc': 'Build complete apps from scratch'},
+        {'id': 'debug',       'label': 'Debug',        'icon': '🐛', 'desc': 'Find and fix bugs systematically'},
+        {'id': 'explain',     'label': 'Explain',      'icon': '📖', 'desc': 'Explain code and concepts clearly'},
+        {'id': 'refactor',    'label': 'Refactor',     'icon': '✨', 'desc': 'Clean up and improve existing code'},
+    ]
+    return jsonify({'modes': modes})
+
 
 if __name__ == '__main__':
     _validate_api_configuration()
