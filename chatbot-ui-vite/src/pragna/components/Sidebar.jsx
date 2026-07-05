@@ -299,7 +299,7 @@ const Sidebar = ({
       
       {/* Wordmark logo */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '20px 20px 16px 20px' }}>
-        <img src={pragnaLogo} alt="Pragna I-A" style={{ height: '100px', width: 'auto', objectFit: 'contain' }} />
+        <img src={pragnaLogo} alt="Pragna I-A" style={{ height: '150px', width: 'auto', objectFit: 'contain' }} />
       </div>
 
       {/* New chat button */}
