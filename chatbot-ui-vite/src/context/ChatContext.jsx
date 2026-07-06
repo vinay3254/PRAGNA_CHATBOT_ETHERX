@@ -48,6 +48,9 @@ export function ChatProvider({ children }) {
   // Ref to input field for focusing when mode is selected
   const inputRef = useRef(null);
 
+  // Ref to the sidebar's search input, focused via the Ctrl/Cmd+K shortcut
+  const sidebarSearchInputRef = useRef(null);
+
   // Close sidebar when window resizes to mobile, open when it grows to desktop
   useEffect(() => {
     const handleResize = () => {
@@ -185,6 +188,7 @@ export function ChatProvider({ children }) {
         chatMode,
         setChatMode,
         inputRef,
+        sidebarSearchInputRef,
       }}
     >
       {children}

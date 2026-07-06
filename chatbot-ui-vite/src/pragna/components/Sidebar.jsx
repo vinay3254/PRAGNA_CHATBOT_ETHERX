@@ -19,7 +19,7 @@ const Sidebar = ({
   onClose,
   onOpenSettings,
 }) => {
-  const { language, setLanguage, folders, createFolder, renameFolder, deleteFolder, moveChatToFolder } = useContext(ChatContext)
+  const { language, setLanguage, folders, createFolder, renameFolder, deleteFolder, moveChatToFolder, sidebarSearchInputRef } = useContext(ChatContext)
 
   const [pinnedChats, setPinnedChats] = useState(new Set())
   const [renameDialogId, setRenameDialogId] = useState(null)
@@ -383,6 +383,7 @@ const Sidebar = ({
       >
         <div style={{ padding: '0 10px 10px 10px' }}>
           <input
+            ref={sidebarSearchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
