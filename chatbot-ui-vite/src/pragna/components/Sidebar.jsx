@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useContext } from 'react'
-import { Folder, FolderPlus, MoreVertical, Edit2, Trash2 } from 'lucide-react'
+import { Folder, FolderPlus, MoreVertical, Edit2, Trash2, PanelLeftClose } from 'lucide-react'
 import pragnaLogo from '../../assets/pragna-logo-full.png'
 import ChatManagementAPI from '../../api/chatManagement'
 import RecentItem from './RecentItem'
@@ -19,7 +19,7 @@ const Sidebar = ({
   onClose,
   onOpenSettings,
 }) => {
-  const { language, setLanguage, folders, createFolder, renameFolder, deleteFolder, moveChatToFolder, sidebarSearchInputRef, duplicateChat } = useContext(ChatContext)
+  const { language, setLanguage, folders, createFolder, renameFolder, deleteFolder, moveChatToFolder, toggleSidebar, sidebarSearchInputRef, duplicateChat } = useContext(ChatContext)
 
   const [pinnedChats, setPinnedChats] = useState(new Set())
   const [renameDialogId, setRenameDialogId] = useState(null)
@@ -303,8 +303,17 @@ const Sidebar = ({
     <aside style={{ width: '288px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'rgba(20,20,20,0.82)', borderRight: '1px solid #2d2a24', backdropFilter: 'blur(8px)', height: '100%' }}>
       
       {/* Wordmark logo */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '20px 20px 16px 20px' }}>
-        <img src={pragnaLogo} alt="Pragna I-A" style={{ height: '150px', width: 'auto', objectFit: 'contain' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 16px 20px' }}>
+        <img src={pragnaLogo} alt="Pragna I-A" style={{ height: '150px', width: '300px', objectFit: 'cover' }} />
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title="Close sidebar"
+          style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', color: '#a89878', cursor: 'pointer', display: 'flex', flexShrink: 0 }}
+          className="hover:bg-[#1a1a1a] hover:text-[#e5c76b]"
+        >
+          <PanelLeftClose size={18} />
+        </button>
       </div>
 
       {/* New chat button */}

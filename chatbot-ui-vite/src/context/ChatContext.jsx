@@ -3,9 +3,6 @@ import { normalizeLanguageCode } from "../utils/language";
 
 export const ChatContext = createContext();
 
-const isMobile = () =>
-  typeof window !== "undefined" && window.innerWidth <= 768;
-
 export function ChatProvider({ children }) {
   const [chats, setChats] = useState(() => {
     const saved = localStorage.getItem("pragna_chats");
@@ -36,8 +33,11 @@ export function ChatProvider({ children }) {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // Sidebar: closed by default on mobile, open on desktop
-  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile());
+  // Sidebar: open by default, persisted across reloads (desktop only — mobile uses its own drawer state)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("pragna_sidebar_open");
+    return saved === null ? true : JSON.parse(saved);
+  });
 
   const [user, setUser] = useState(null);
 
@@ -51,18 +51,10 @@ export function ChatProvider({ children }) {
   // Ref to the sidebar's search input, focused via the Ctrl/Cmd+K shortcut
   const sidebarSearchInputRef = useRef(null);
 
-  // Close sidebar when window resizes to mobile, open when it grows to desktop
+  // Persist sidebar open/closed state
   useEffect(() => {
-    const handleResize = () => {
-      if (isMobile()) {
-        setSidebarOpen(false);
-      } else {
-        setSidebarOpen(true);
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    localStorage.setItem("pragna_sidebar_open", JSON.stringify(sidebarOpen));
+  }, [sidebarOpen]);
 
   // Save to localStorage
   useEffect(() => {

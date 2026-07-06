@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Menu } from 'lucide-react'
+import { useContext, useState } from 'react'
+import { Menu, PanelLeft } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import { ChatContext } from '../../context/ChatContext'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const MainLayout = ({
@@ -19,12 +20,13 @@ const MainLayout = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const isDesktop = useMediaQuery('(min-width: 1024px)')
+  const { sidebarOpen, toggleSidebar } = useContext(ChatContext)
 
   return (
     <div className="pragna-shell flex h-screen overflow-hidden bg-transparent">
       {/* Desktop Sidebar */}
-      {isDesktop && (
-        <div className="w-72 flex-shrink-0">
+      {isDesktop && sidebarOpen && (
+        <div style={{ width: '340px' }} className="flex-shrink-0">
           <Sidebar
             activeView={activeView}
             onViewChange={onViewChange}
@@ -78,6 +80,17 @@ const MainLayout = ({
 
       {/* Main Content */}
       <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Reopen sidebar button (desktop only, shown when sidebar is closed) */}
+        {isDesktop && !sidebarOpen && (
+          <button
+            onClick={toggleSidebar}
+            title="Open sidebar"
+            className="fixed top-4 left-4 z-30 p-2 rounded-lg bg-surface/80 backdrop-blur-sm border border-border hover:bg-surface-subtle transition-colors"
+          >
+            <PanelLeft size={18} className="text-[var(--pragna-text-muted)]" />
+          </button>
+        )}
+
         {/* Mobile Header */}
         {!isDesktop && (
           <div className="sticky top-0 z-20 bg-surface/80 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center justify-between">
