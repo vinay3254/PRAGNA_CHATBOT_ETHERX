@@ -28,6 +28,11 @@ const PencilIcon = () => (
     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
   </svg>
 );
+const StarIcon = ({ filled }) => (
+  <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
 const VoiceIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -316,7 +321,7 @@ const renderAttachments = (attachments) => (
   </div>
 );
 
-export default function MessageBubble({ message, language = "en", onRetry, onEdit, isLoading }) {
+export default function MessageBubble({ message, language = "en", onRetry, onEdit, isLoading, onToggleBookmark }) {
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -453,6 +458,7 @@ export default function MessageBubble({ message, language = "en", onRetry, onEdi
   const hasText = (message.text || "").trim().length > 0;
   const showTypingDots = isBot && isStreaming && !hasText && !isError;
   const hasAttachments = message.attachments && message.attachments.length > 0;
+  const bookmarked = !!message.bookmarked;
 
   // ── User message: gold-gradient bubble ─────────────────────────────────
   if (!isBot) {
@@ -527,19 +533,31 @@ export default function MessageBubble({ message, language = "en", onRetry, onEdi
               {hasAttachments && renderAttachments(message.attachments)}
               {message.text}
             </div>
-            {onEdit && !isLoading && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDraftText(message.text || "");
-                  setIsEditing(true);
-                }}
-                title="Edit message"
-                className={`${actionBtnBase} opacity-0 group-hover:opacity-100 text-[color:var(--pragna-text-muted)]`}
-              >
-                <PencilIcon />
-              </button>
-            )}
+            <div className="flex gap-1">
+              {onToggleBookmark && (
+                <button
+                  type="button"
+                  onClick={onToggleBookmark}
+                  title={bookmarked ? "Remove bookmark" : "Bookmark message"}
+                  className={`${actionBtnBase} ${bookmarked ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${bookmarked ? "text-accent-400" : "text-[color:var(--pragna-text-muted)]"}`}
+                >
+                  <StarIcon filled={bookmarked} />
+                </button>
+              )}
+              {onEdit && !isLoading && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraftText(message.text || "");
+                    setIsEditing(true);
+                  }}
+                  title="Edit message"
+                  className={`${actionBtnBase} opacity-0 group-hover:opacity-100 text-[color:var(--pragna-text-muted)]`}
+                >
+                  <PencilIcon />
+                </button>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -620,6 +638,16 @@ export default function MessageBubble({ message, language = "en", onRetry, onEdi
               >
                 <CopyIcon />
               </button>
+              {onToggleBookmark && (
+                <button
+                  type="button"
+                  onClick={onToggleBookmark}
+                  title={bookmarked ? "Remove bookmark" : "Bookmark message"}
+                  className={`${actionBtnBase} ${bookmarked ? "text-accent-400" : "text-[color:var(--pragna-text-muted)]"}`}
+                >
+                  <StarIcon filled={bookmarked} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleThumbsUp}

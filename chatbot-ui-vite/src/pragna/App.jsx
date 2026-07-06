@@ -12,6 +12,7 @@ import GlobalDashboard from '../components/dashboard/GlobalDashboard'
 import WorldMonitorDashboard from '../components/dashboard/WorldMonitorDashboard'
 import AgentPanel from '../components/agent/AgentPanel'
 import SettingsModal from './components/SettingsModal'
+import ShortcutsHelpModal from './components/ShortcutsHelpModal'
 
 const IMAGE_REQUEST_RE = /(create|generate|make|design)\s+(an?\s+)?(ai\s+)?image|image\s+of|illustration\s+of|poster\s+of|logo\s+of/i
 
@@ -33,6 +34,7 @@ function App({ onLogout, userProfile }) {
   const [generatedImage, setGeneratedImage] = useState(null)
   const [imageError, setImageError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
 
   const {
     chats,
@@ -46,6 +48,9 @@ function App({ onLogout, userProfile }) {
     setIsLoading,
     chatMode,
     setChatMode,
+    sidebarOpen,
+    toggleSidebar,
+    sidebarSearchInputRef,
   } = useContext(ChatContext)
 
   useEffect(() => {
@@ -170,10 +175,37 @@ function App({ onLogout, userProfile }) {
     }
   }, [activeChatId, chatMode, chats, isLoading, language, setActiveChatId, setChats, setIsLoading])
 
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
     newChat()
     setActiveView('chats')
-  }
+  }, [newChat])
+
+  // Global keyboard shortcuts: Ctrl/Cmd+K focus search, Ctrl/Cmd+Shift+O new chat, Ctrl/Cmd+/ toggle help
+  useEffect(() => {
+    const handleGlobalKeydown = (e) => {
+      const mod = e.ctrlKey || e.metaKey
+      if (!mod) return
+
+      const key = e.key.toLowerCase()
+
+      if (key === 'k' && !e.shiftKey) {
+        if (settingsOpen || shortcutsHelpOpen) return
+        e.preventDefault()
+        if (!sidebarOpen) toggleSidebar()
+        setTimeout(() => sidebarSearchInputRef.current?.focus(), 0)
+      } else if (key === 'o' && e.shiftKey) {
+        if (settingsOpen || shortcutsHelpOpen) return
+        e.preventDefault()
+        handleNewChat()
+      } else if (e.key === '/') {
+        if (settingsOpen) return
+        e.preventDefault()
+        setShortcutsHelpOpen((prev) => !prev)
+      }
+    }
+    document.addEventListener('keydown', handleGlobalKeydown)
+    return () => document.removeEventListener('keydown', handleGlobalKeydown)
+  }, [settingsOpen, shortcutsHelpOpen, sidebarOpen, toggleSidebar, sidebarSearchInputRef, handleNewChat])
 
   const handleGenerateImage = async () => {
     if (!imagePrompt.trim() || isGeneratingImage) return
@@ -280,6 +312,11 @@ function App({ onLogout, userProfile }) {
         onClose={() => setSettingsOpen(false)}
         onLogout={onLogout}
         userProfile={userProfile}
+      />
+
+      <ShortcutsHelpModal
+        isOpen={shortcutsHelpOpen}
+        onClose={() => setShortcutsHelpOpen(false)}
       />
     </>
   )
