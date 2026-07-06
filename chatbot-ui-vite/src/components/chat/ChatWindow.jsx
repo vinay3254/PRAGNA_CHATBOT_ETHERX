@@ -210,6 +210,23 @@ export default function ChatWindow() {
     sendSuggestionMessage(trimmed);
   }, [activeChatId, isLoading, setChats, sendSuggestionMessage]);
 
+  // Toggle the bookmarked flag on a single message, leaving everything else untouched
+  const toggleBookmark = useCallback((idx) => {
+    const targetChatId = activeChatId;
+    setChats((prev) =>
+      prev.map((c) =>
+        c.id === targetChatId
+          ? {
+              ...c,
+              messages: c.messages.map((m, i) =>
+                i === idx ? { ...m, bookmarked: !m.bookmarked } : m
+              ),
+            }
+          : c
+      )
+    );
+  }, [activeChatId, setChats]);
+
   // Mode select handler
   const handleSelectMode = (label) => {
     const modeKey = dbModeFromLabel(label);
@@ -446,6 +463,7 @@ export default function ChatWindow() {
               onRetry={idx === chat.messages.length - 1 ? () => retryMessage(idx) : undefined}
               onEdit={m.sender !== "bot" ? (newText) => editMessage(idx, newText) : undefined}
               isLoading={isLoading}
+              onToggleBookmark={() => toggleBookmark(idx)}
             />
           ))}
         </div>
