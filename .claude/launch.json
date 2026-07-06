@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "chat-ui-batch2-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", ".worktrees/chat-ui-batch2/chatbot-ui-vite"],
+      "port": 5180
+    },
+    {
+      "name": "main-frontend-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "chatbot-ui-vite"],
+      "port": 5180
+    }
+  ]
+}

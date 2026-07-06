@@ -4,7 +4,13 @@
       "Bash(netstat -ano)",
       "Bash(awk '{print $5}')",
       "Bash(xargs -I{} taskkill //F //PID {})",
-      "Bash(python app.py)"
+      "Bash(python app.py)",
+      "Bash(npm run *)",
+      "Bash(git -C .. add chatbot-ui-vite/src/components/chat/ChatWindow.jsx chatbot-ui-vite/src/components/chat/MessageBubble.jsx)",
+      "Bash(git -C .. status --short)",
+      "Bash(git -C .. add chatbot-ui-vite/src/pragna/components/RecentItem.jsx chatbot-ui-vite/src/pragna/components/Sidebar.jsx)",
+      "Bash(git -C .. commit -m ' *)",
+      "Bash(git -C .. add chatbot-ui-vite/src/pragna/components/Sidebar.jsx)"
     ]
   }
 }
