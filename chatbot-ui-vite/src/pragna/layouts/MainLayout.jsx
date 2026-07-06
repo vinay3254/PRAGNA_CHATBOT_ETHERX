@@ -26,7 +26,7 @@ const MainLayout = ({
     <div className="pragna-shell flex h-screen overflow-hidden bg-transparent">
       {/* Desktop Sidebar */}
       {isDesktop && sidebarOpen && (
-        <div style={{ width: '340px' }} className="flex-shrink-0">
+        <div className="w-72 flex-shrink-0">
           <Sidebar
             activeView={activeView}
             onViewChange={onViewChange}
