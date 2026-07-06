@@ -304,16 +304,18 @@ const Sidebar = ({
       
       {/* Wordmark logo */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 16px 20px' }}>
-        <img src={pragnaLogo} alt="Pragna I-A" style={{ height: '150px', width: '300px', objectFit: 'cover' }} />
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          title="Close sidebar"
-          style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', color: '#a89878', cursor: 'pointer', display: 'flex', flexShrink: 0 }}
-          className="hover:bg-[#1a1a1a] hover:text-[#e5c76b]"
-        >
-          <PanelLeftClose size={18} />
-        </button>
+        <img src={pragnaLogo} alt="Pragna I-A" style={{ height: '150px', width: 'auto', objectFit: 'contain' }} />
+        {!onClose && (
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title="Close sidebar"
+            style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', color: '#a89878', cursor: 'pointer', display: 'flex', flexShrink: 0 }}
+            className="hover:bg-[#1a1a1a] hover:text-[#e5c76b]"
+          >
+            <PanelLeftClose size={18} />
+          </button>
+        )}
       </div>
 
       {/* New chat button */}
