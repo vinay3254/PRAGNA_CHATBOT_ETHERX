@@ -178,7 +178,7 @@ const Sidebar = ({
   h1 { font-size: 22px; }
   .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
   hr { border: none; border-top: 1px solid #ccc; margin: 24px 0; }
-  p { line-height: 1.6; }
+  p { line-height: 1.6; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -193,7 +193,7 @@ ${turns}
     if (!printWindow) return
     printWindow.document.write(html)
     printWindow.document.close()
-    printWindow.onload = () => printWindow.print()
+    printWindow.print()
   }
 
   const handleDuplicate = (chatId) => {
