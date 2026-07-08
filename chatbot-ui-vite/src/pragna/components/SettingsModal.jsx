@@ -20,7 +20,7 @@ const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
   const [toolAccessMode, setToolAccessMode] = useState('Load tools when needed')
   const [modelProfile, setModelProfile] = useState(() => localStorage.getItem('pragna_model_profile') || 'basic')
   const [modelCatalog, setModelCatalog] = useState(null)
-  const [modelCatalogLoading, setModelCatalogLoading] = useState(false)
+  const modelCatalogLoading = isOpen && activeTab === 'Model' && !modelCatalog
 
   useEffect(() => {
     if (!isOpen) return
@@ -33,11 +33,9 @@ const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
 
   useEffect(() => {
     if (!isOpen || activeTab !== 'Model' || modelCatalog) return
-    setModelCatalogLoading(true)
     getModelsCatalog()
       .then((data) => setModelCatalog(data))
       .catch((err) => console.warn('Models catalog unavailable:', err))
-      .finally(() => setModelCatalogLoading(false))
   }, [isOpen, activeTab, modelCatalog])
 
   const handleModelProfileChange = (profile) => {
