@@ -198,6 +198,38 @@ export const getWorldMonitorConfig = async () => {
   return response.json();
 };
 
+export const getRagSchedulerStatus = async () => {
+  const response = await fetch("/api/rag/scheduler/status");
+  if (!response.ok) {
+    throw new Error("Failed to fetch RAG scheduler status.");
+  }
+  return response.json();
+};
+
+export const forceRagUpdate = async () => {
+  const response = await fetch("/api/rag/scheduler/force_update", { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to force RAG update.");
+  }
+  return response.json();
+};
+
+export const enableRagScheduler = async () => {
+  const response = await fetch("/api/rag/scheduler/enable", { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to enable RAG scheduler.");
+  }
+  return response.json();
+};
+
+export const disableRagScheduler = async () => {
+  const response = await fetch("/api/rag/scheduler/disable", { method: "POST" });
+  if (!response.ok) {
+    throw new Error("Failed to disable RAG scheduler.");
+  }
+  return response.json();
+};
+
 export const generateAIImage = async ({ prompt, style = "cinematic", quality = "hd", size = "1024x1024" }) => {
   let response;
   try {

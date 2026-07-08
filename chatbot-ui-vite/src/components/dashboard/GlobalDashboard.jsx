@@ -4,6 +4,10 @@ import {
   getPlatformStatus,
   getRealtimeEventsFeed,
   getWorldMonitorConfig,
+  getRagSchedulerStatus,
+  forceRagUpdate,
+  enableRagScheduler,
+  disableRagScheduler,
 } from "../../api/api";
 
 const severityClass = {
@@ -28,6 +32,8 @@ export default function GlobalDashboard() {
   const [severityFilter, setSeverityFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [schedulerStatus, setSchedulerStatus] = useState(null);
+  const [schedulerActionLoading, setSchedulerActionLoading] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -52,11 +58,46 @@ export default function GlobalDashboard() {
       } catch (wmErr) {
         console.warn("World Monitor config unavailable:", wmErr);
       }
+
+      try {
+        const schedulerData = await getRagSchedulerStatus();
+        setSchedulerStatus(schedulerData?.scheduler || null);
+      } catch (schedErr) {
+        console.warn("RAG scheduler status unavailable:", schedErr);
+      }
     } catch (err) {
       console.error("Failed to load global dashboard:", err);
       setError("Unable to load realtime intelligence.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForceUpdate = async () => {
+    setSchedulerActionLoading(true);
+    try {
+      await forceRagUpdate();
+      await refresh();
+    } catch (err) {
+      console.error("Failed to force RAG update:", err);
+    } finally {
+      setSchedulerActionLoading(false);
+    }
+  };
+
+  const handleToggleScheduler = async () => {
+    setSchedulerActionLoading(true);
+    try {
+      if (schedulerStatus?.enabled) {
+        await disableRagScheduler();
+      } else {
+        await enableRagScheduler();
+      }
+      await refresh();
+    } catch (err) {
+      console.error("Failed to toggle RAG scheduler:", err);
+    } finally {
+      setSchedulerActionLoading(false);
     }
   };
 
@@ -178,6 +219,48 @@ export default function GlobalDashboard() {
               {pill}
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {schedulerStatus ? (
+        <div className="glass-card mb-5 rounded-2xl px-5 py-4.5 shadow-premium-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="m-0 text-sm font-bold text-[color:var(--pragna-text)]">RAG Scheduler</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={handleForceUpdate}
+                disabled={schedulerActionLoading}
+                className="rounded-lg border border-accent-500/35 bg-accent-500/10 px-3 py-1.5 text-xs font-semibold text-[color:var(--pragna-text)] transition-colors hover:bg-accent-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Force update now
+              </button>
+              <button
+                onClick={handleToggleScheduler}
+                disabled={schedulerActionLoading}
+                className="rounded-lg border border-border bg-surface-subtle px-3 py-1.5 text-xs font-semibold text-[color:var(--pragna-text-muted)] transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {schedulerStatus.enabled ? "Disable" : "Enable"}
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-xs text-[color:var(--pragna-text-muted)] md:grid-cols-4">
+            <div>
+              <div className="mb-1 text-[color:var(--pragna-text)] font-semibold">Last update</div>
+              {schedulerStatus.last_update ? new Date(schedulerStatus.last_update).toLocaleString() : "Never"}
+            </div>
+            <div>
+              <div className="mb-1 text-[color:var(--pragna-text)] font-semibold">Update count</div>
+              {schedulerStatus.update_count}
+            </div>
+            <div>
+              <div className="mb-1 text-[color:var(--pragna-text)] font-semibold">Errors</div>
+              {schedulerStatus.update_errors}
+            </div>
+            <div>
+              <div className="mb-1 text-[color:var(--pragna-text)] font-semibold">Next update</div>
+              {typeof schedulerStatus.next_update_in_hours === "number" ? `${schedulerStatus.next_update_in_hours}h` : schedulerStatus.next_update_in_hours}
+            </div>
+          </div>
         </div>
       ) : null}
 
