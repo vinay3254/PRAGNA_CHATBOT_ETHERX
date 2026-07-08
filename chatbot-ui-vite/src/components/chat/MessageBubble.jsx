@@ -327,6 +327,7 @@ export default function MessageBubble({ message, language = "en", onRetry, onEdi
   const [speaking, setSpeaking] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [draftText, setDraftText] = useState(message.text || "");
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
 
   const copyToClipboard = () => {
     navigator.clipboard?.writeText(message.text);
@@ -625,6 +626,33 @@ export default function MessageBubble({ message, language = "en", onRetry, onEdi
             </div>
           ) : (
             renderContentBlocks(message.text, isStreaming)
+          )}
+
+          {isBot && !isStreaming && !isError && message.sources?.length > 0 && (
+            <div className="text-[13px]">
+              <button
+                type="button"
+                onClick={() => setSourcesExpanded((prev) => !prev)}
+                className="text-[color:var(--pragna-text-muted)] hover:text-accent-400 transition-colors duration-150"
+              >
+                {sourcesExpanded ? "▾" : "▸"} Sources ({message.sources.length})
+              </button>
+              {sourcesExpanded && (
+                <ul className="mt-1.5 flex flex-col gap-1 pl-4 list-disc">
+                  {message.sources.map((src, idx) => (
+                    <li key={idx} className="text-[color:var(--pragna-text-muted)]">
+                      {src.source ? (
+                        <a href={src.source} target="_blank" rel="noopener noreferrer" className="text-accent-400 hover:underline">
+                          {src.title || src.source}
+                        </a>
+                      ) : (
+                        <span>{src.title || "Untitled source"}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {/* Only show action icons for finished, non-error assistant messages */}
