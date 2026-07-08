@@ -342,9 +342,13 @@ ${turns}
     setUserMenuOpen(false)
   }
 
-  const filteredChats = recentChats.filter((chat) =>
-    (chat.title || 'New chat').toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredChats = recentChats.filter((chat) => {
+    const query = searchQuery.toLowerCase()
+    if (!query) return true
+    const titleMatch = (chat.title || 'New chat').toLowerCase().includes(query)
+    const messageMatch = (chat.messages || []).some((msg) => (msg.text || '').toLowerCase().includes(query))
+    return titleMatch || messageMatch
+  })
 
   const unfiledChats = filteredChats.filter((chat) => !chat.folderId)
 
