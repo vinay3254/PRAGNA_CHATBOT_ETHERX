@@ -2016,6 +2016,52 @@ Assistant: {ai_response[:200]}"""
         logger.error(f"Summarize error: {e}", exc_info=True)
         return jsonify({'summary': 'New Chat', 'error': str(e)}), 200
 
+
+@app.route('/api/summarize_chat', methods=['POST'])
+def summarize_chat():
+    """Generate a real, multi-sentence summary of a full conversation."""
+    try:
+        data = request.json or {}
+        messages_in = data.get('messages', [])
+        language = _normalize_language_code(data.get('language', 'en'))
+
+        if not messages_in:
+            return jsonify({'error': 'messages is required'}), 400
+
+        transcript_lines = []
+        for msg in messages_in:
+            speaker = 'Pragna' if msg.get('sender') == 'bot' else 'You'
+            text = (msg.get('text') or '').strip()
+            if text:
+                transcript_lines.append(f"{speaker}: {text}")
+        transcript = "\n".join(transcript_lines)
+
+        if not transcript:
+            return jsonify({'error': 'No message content to summarize'}), 400
+
+        from services.llm import generate_completion
+        prompt_messages = [
+            {
+                'role': 'system',
+                'content': (
+                    'Summarize the following conversation in 3-5 sentences, covering '
+                    'the main topics discussed and any conclusions reached. Write the '
+                    'summary as plain prose, not a list.'
+                ),
+            },
+            {'role': 'user', 'content': transcript},
+        ]
+        summary = generate_completion(prompt_messages, language=language)
+
+        if not summary or not summary.strip():
+            return jsonify({'error': 'Failed to generate summary'}), 500
+
+        return jsonify({'summary': summary.strip()}), 200
+
+    except Exception as e:
+        logger.error(f"Summarize chat error: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to generate summary'}), 500
+
 # Register blueprints
 app.register_blueprint(chat_management_bp)
 
