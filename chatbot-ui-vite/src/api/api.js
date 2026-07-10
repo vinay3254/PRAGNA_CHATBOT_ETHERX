@@ -99,6 +99,52 @@ export const sendOrchestratedMessage = async (text, language, user_id, chatMode 
   return data;
 };
 
+export const sendOrchestratedMessageStream = async ({
+  text,
+  language,
+  user_id,
+  chatMode = "general",
+  onChunk,
+  onSources,
+  onDone,
+}) => {
+  const normalizedLanguage = normalizeLanguageCode(language);
+  const modelRouting = _resolveModelProfileRouting();
+
+  const response = await fetch("/api/chat_stream", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: text,
+      language: normalizedLanguage,
+      user_id,
+      chat_mode: chatMode,
+      model_override: modelRouting.model_override,
+      fallback_models: modelRouting.fallback_models,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Server error. Please try again.");
+  }
+
+  await _consumeSSE(response, (event) => {
+    if (event.content) {
+      onChunk?.(event.content);
+    } else if (event.sources) {
+      onSources?.(event.sources);
+    } else if (event.actions) {
+      runResponseActions({ actions: event.actions });
+    } else if (event.type === "done") {
+      onDone?.();
+    } else if (event.type === "error") {
+      throw new Error(event.content || "Stream error");
+    }
+  });
+};
+
 export const sendOrchestratedUploadMessage = async (
   text,
   language,

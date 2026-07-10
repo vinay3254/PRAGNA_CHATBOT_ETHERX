@@ -1653,7 +1653,7 @@ def chat_stream():
         logger.info(f"Received streaming request: {user_message[:50]}... (language: {language}, mode: {chat_mode})")
 
         def stream_orchestrated_chunks():
-            """Stream orchestrated response in JSON lines for frontend compatibility."""
+            """Stream orchestrated response as real SSE (data: <json>\\n\\n lines)."""
             result = orchestrator.handle_query(
                 user_message,
                 language=language,
@@ -1666,18 +1666,17 @@ def chat_stream():
             actions = result.get('actions', [])
             sources = result.get('web_search_sources', [])
             if actions:
-                yield json.dumps({'actions': actions}) + "\n"
+                yield f"data: {json.dumps({'actions': actions})}\n\n"
             if sources:
-                yield json.dumps({'sources': sources}) + "\n"
+                yield f"data: {json.dumps({'sources': sources})}\n\n"
 
             response_text = result.get('response', '')
-            if not response_text:
-                return
-
             chunk_size = 200
             for i in range(0, len(response_text), chunk_size):
                 chunk = response_text[i:i + chunk_size]
-                yield json.dumps({'content': chunk}) + "\n"
+                yield f"data: {json.dumps({'content': chunk})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
         return Response(stream_orchestrated_chunks(), mimetype='text/event-stream')
         
