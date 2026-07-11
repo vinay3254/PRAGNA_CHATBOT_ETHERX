@@ -1,6 +1,6 @@
 import { useContext, useState, useRef, useCallback, useEffect } from "react";
 import { ChatContext } from "../../context/ChatContext";
-import { generateAIImage, sendOrchestratedMessage, sendOrchestratedMessageStream, sendOrchestratedUploadMessage } from "../../api/api";
+import { generateAIImage, generateDocument, sendOrchestratedMessage, sendOrchestratedMessageStream, sendOrchestratedUploadMessage } from "../../api/api";
 import { normalizeLanguageCode } from "../../utils/language";
 import LanguageSelector from "./LanguageSelector";
 
@@ -19,6 +19,26 @@ const extractImagePrompt = (text) => {
   return raw
     .replace(/^(please\s+)?(create|generate|make|design)\s+(an?\s+)?(ai\s+)?(image|picture|photo|illustration)\s+(of|for)?\s*/i, "")
     .trim() || raw;
+};
+
+const DOCUMENT_VERB_RE = /\b(create|generate|make|write|draft)\b.*\b(word\s*doc(ument)?|report|excel\s*(sheet|spreadsheet)|spreadsheet|pdf|power\s*point|presentation|slides?)\b/i;
+
+const DOCUMENT_FORMAT_PATTERNS = [
+  { format: "pptx", re: /power\s*point|presentation|slides?/i },
+  { format: "xlsx", re: /excel|spreadsheet|sheet/i },
+  { format: "pdf", re: /\bpdf\b/i },
+  { format: "docx", re: /word\s*doc(ument)?|\bdoc(ument)?\b|report/i },
+];
+
+const extractDocumentRequest = (text) => {
+  const raw = (text || "").trim();
+  if (!raw || !DOCUMENT_VERB_RE.test(raw)) return null;
+  const match = DOCUMENT_FORMAT_PATTERNS.find((p) => p.re.test(raw));
+  if (!match) return null;
+  const subject = raw
+    .replace(/^(please\s+)?(create|generate|make|write|draft)\s+(an?\s+)?(ms\s*)?(word\s*doc(ument)?|excel\s*(sheet|spreadsheet)|spreadsheet|pdf|power\s*point(\s*(presentation|deck))?|presentation|slides?|report)\s*(about|on|for|regarding)?\s*/i, "")
+    .trim() || raw;
+  return { format: match.format, subject };
 };
 
 // Generate smart title from user input and AI response
@@ -175,6 +195,45 @@ export default function InputBar() {
 
     try {
       const normalizedLanguage = normalizeLanguageCode(language);
+
+      const docRequest = msgAttachments.length === 0 ? extractDocumentRequest(msgText) : null;
+      if (docRequest) {
+        const docResult = await generateDocument({
+          format: docRequest.format,
+          prompt: docRequest.subject,
+          language: normalizedLanguage,
+        });
+
+        setIsLoading(false);
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === targetChatId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m, idx) =>
+                    idx === c.messages.length - 1
+                      ? {
+                          ...m,
+                          text: "Generated document ready.",
+                          isStreaming: false,
+                          attachments: [
+                            {
+                              name: docResult.filename,
+                              type: "document",
+                              downloadUrl: docResult.download_url,
+                              format: docRequest.format,
+                            },
+                          ],
+                        }
+                      : m
+                  ),
+                }
+              : c
+          )
+        );
+        return;
+      }
+
       const isImageRequest = IMAGE_REQUEST_RE.test(msgText) && msgAttachments.length === 0;
 
       if (isImageRequest) {
