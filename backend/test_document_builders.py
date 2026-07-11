@@ -46,6 +46,8 @@ def test_pdf():
         reader = PdfReader(path)
         text = "".join(page.extract_text() or "" for page in reader.pages)
         assert "Test Document" in text
+        assert "Point one" in text
+        assert "Quarter" in text
         print("PASS: pdf builder")
 
 
@@ -57,6 +59,10 @@ def test_pptx():
         prs = PptxReader(path)
         assert len(prs.slides) == 3  # title slide + 2 section slides
         assert prs.slides[0].shapes.title.text == "Test Document"
+        overview_body = "\n".join(p.text for p in prs.slides[1].placeholders[1].text_frame.paragraphs)
+        assert "Point one" in overview_body
+        numbers_body = "\n".join(p.text for p in prs.slides[2].placeholders[1].text_frame.paragraphs)
+        assert "Quarter" in numbers_body and "Revenue" in numbers_body
         print("PASS: pptx builder")
 
 
