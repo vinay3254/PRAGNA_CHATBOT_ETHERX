@@ -326,6 +326,30 @@ export const generateAIImage = async ({ prompt, style = "cinematic", quality = "
   return data;
 };
 
+export const generateDocument = async ({ format, prompt, language = "en" }) => {
+  let response;
+  try {
+    response = await fetch("/api/documents/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ format, prompt, language }),
+    });
+  } catch (err) {
+    throw new Error("Cannot reach backend. Start/restart backend server on port 5001.");
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Document API not found. Restart backend to load the new /api/documents/generate route.");
+    }
+    throw new Error(data?.error || "Document generation failed.");
+  }
+  return data;
+};
+
 
 // ── Pragna Code Agent ────────────────────────────────────────────────────────
 
