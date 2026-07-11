@@ -284,6 +284,21 @@ export const getModelsCatalog = async () => {
   return response.json();
 };
 
+export const summarizeChat = async (messages, language) => {
+  const response = await fetch("/api/summarize_chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ messages, language: normalizeLanguageCode(language) }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to summarize chat.");
+  }
+  return data;
+};
+
 export const generateAIImage = async ({ prompt, style = "cinematic", quality = "hd", size = "1024x1024" }) => {
   let response;
   try {

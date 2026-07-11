@@ -1,6 +1,6 @@
 import { useContext, useCallback, useState, useEffect } from "react";
 import { ChatContext } from "../../context/ChatContext";
-import { generateAIImage, sendOrchestratedMessageStream } from "../../api/api";
+import { generateAIImage, sendOrchestratedMessageStream, summarizeChat } from "../../api/api";
 import MessageBubble from "./MessageBubble";
 import { normalizeLanguageCode } from "../../utils/language";
 
@@ -253,6 +253,27 @@ export default function ChatWindow() {
     );
   }, [activeChatId, setChats]);
 
+  // Summarize the active chat and append the result as a new message
+  const [summarizing, setSummarizing] = useState(false);
+  const handleSummarize = useCallback(async () => {
+    if (!chat || summarizing) return;
+    setSummarizing(true);
+    try {
+      const { summary } = await summarizeChat(chat.messages, language);
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? { ...c, messages: [...c.messages, { sender: "bot", text: summary }] }
+            : c
+        )
+      );
+    } catch (err) {
+      console.error("Summarize error:", err);
+    } finally {
+      setSummarizing(false);
+    }
+  }, [chat, activeChatId, language, setChats, summarizing]);
+
   // Mode select handler
   const handleSelectMode = (label) => {
     const modeKey = dbModeFromLabel(label);
@@ -476,6 +497,29 @@ export default function ChatWindow() {
           <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#d4af37', boxShadow: '0 0 8px rgba(212,175,55,0.8)' }}></span>
           {modeLabel} mode
         </div>
+        <button
+          onClick={handleSummarize}
+          disabled={summarizing}
+          title="Summarize this conversation"
+          style={{
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 14px',
+            borderRadius: '999px',
+            border: '1px solid #2d2a24',
+            background: 'transparent',
+            color: '#a89878',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            cursor: summarizing ? 'default' : 'pointer',
+            opacity: summarizing ? 0.6 : 1,
+          }}
+          className="hover:text-[#e5c76b] hover:border-accent-500/40"
+        >
+          {summarizing ? 'Summarizing…' : 'Summarize'}
+        </button>
       </div>
 
       {/* Messages Scroll Area */}
