@@ -1,7 +1,7 @@
 import { useContext, useState, useRef, useCallback, useEffect } from "react";
 import { ChatContext } from "../../context/ChatContext";
-import { generateAIImage, generateDocument, sendOrchestratedMessage, sendOrchestratedMessageStream, sendOrchestratedUploadMessage } from "../../api/api";
-import { normalizeLanguageCode } from "../../utils/language";
+import { generateAIImage, generateDocument, sendOrchestratedMessage, sendOrchestratedMessageStream, sendOrchestratedUploadMessage, summarizeChat } from "../../api/api";
+import { normalizeLanguageCode, SUPPORTED_LANGUAGE_OPTIONS } from "../../utils/language";
 import LanguageSelector from "./LanguageSelector";
 
 // BCP-47 tags for SpeechRecognition
@@ -39,6 +39,23 @@ const extractDocumentRequest = (text) => {
     .replace(/^(please\s+)?(create|generate|make|write|draft)\s+(an?\s+)?(ms\s*)?((word\s*)?doc(ument)?|excel\s*(sheet|spreadsheet)|spreadsheet|pdf|power\s*point(\s*(presentation|deck))?|presentation|slides?|report)\s*(about|on|for|regarding)?\s*/i, "")
     .trim() || raw;
   return { format: match.format, subject };
+};
+
+const SLASH_COMMANDS = [
+  { name: "summarize", usage: "/summarize", description: "Summarize this conversation" },
+  { name: "mode", usage: "/mode <general|explain|ideas|write|code|questions|story>", description: "Switch chat mode" },
+  { name: "lang", usage: "/lang <code>", description: "Switch response language" },
+  { name: "clear", usage: "/clear", description: "Start a new chat" },
+];
+
+const MODE_COMMAND_MAP = {
+  general: "general",
+  explain: "explain_concepts",
+  ideas: "generate_ideas",
+  write: "write_content",
+  code: "code_assistance",
+  questions: "ask_questions",
+  story: "creative_writing",
 };
 
 // Generate smart title from user input and AI response
@@ -80,8 +97,9 @@ export default function InputBar() {
 
   const {
     chats, setChats, activeChatId, setActiveChatId,
-    language, isLoading, setIsLoading, chatMode, inputRef,
+    language, isLoading, setIsLoading, chatMode, setChatMode, inputRef,
     personas, activePersonaId,
+    newChat, setLanguage,
   } = useContext(ChatContext);
 
   const activeChat = chats.find((c) => c.id === activeChatId);
@@ -146,9 +164,104 @@ export default function InputBar() {
     });
   };
 
+  const handleSlashCommand = useCallback(async (rawText) => {
+    const withoutSlash = rawText.slice(1);
+    const spaceIdx = withoutSlash.indexOf(" ");
+    const commandName = (spaceIdx === -1 ? withoutSlash : withoutSlash.slice(0, spaceIdx)).toLowerCase();
+    const arg = (spaceIdx === -1 ? "" : withoutSlash.slice(spaceIdx + 1)).trim();
+
+    let targetChatId = activeChatId;
+    let currentChat = activeChat;
+    if (!targetChatId || !currentChat) {
+      const newId = Date.now().toString();
+      const newChatObj = { id: newId, title: "New chat", messages: [] };
+      setChats((prev) => [newChatObj, ...prev]);
+      setActiveChatId(newId);
+      targetChatId = newId;
+      currentChat = newChatObj;
+    }
+
+    const appendBotMessage = (botText, isError = false) => {
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === targetChatId
+            ? {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  { sender: "user", text: rawText, attachments: [] },
+                  { sender: "bot", text: botText, error: isError },
+                ],
+              }
+            : c
+        )
+      );
+    };
+
+    const command = SLASH_COMMANDS.find((cmd) => cmd.name === commandName);
+    if (!command) {
+      appendBotMessage(
+        `Unknown command "/${commandName}". Available commands: ${SLASH_COMMANDS.map((c) => c.usage).join(", ")}`,
+        true
+      );
+      return;
+    }
+
+    if (commandName === "summarize") {
+      setIsLoading(true);
+      try {
+        const { summary } = await summarizeChat(currentChat.messages, language);
+        appendBotMessage(summary);
+      } catch {
+        appendBotMessage("Failed to summarize this conversation. Please try again.", true);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    if (commandName === "mode") {
+      const modeKey = MODE_COMMAND_MAP[arg.toLowerCase()];
+      if (!modeKey) {
+        appendBotMessage(`Unknown mode "${arg}". Use one of: ${Object.keys(MODE_COMMAND_MAP).join(", ")}`, true);
+        return;
+      }
+      setChatMode(modeKey);
+      appendBotMessage(`Switched to ${arg.toLowerCase()} mode.`);
+      return;
+    }
+
+    if (commandName === "lang") {
+      const langOption = SUPPORTED_LANGUAGE_OPTIONS.find(
+        (o) => o.code === arg.toLowerCase() || o.label.toLowerCase() === arg.toLowerCase()
+      );
+      if (!langOption) {
+        appendBotMessage(
+          `Unknown language "${arg}". Use one of: ${SUPPORTED_LANGUAGE_OPTIONS.map((o) => o.code).join(", ")}`,
+          true
+        );
+        return;
+      }
+      setLanguage(langOption.code);
+      appendBotMessage(`Switched response language to ${langOption.label}.`);
+      return;
+    }
+
+    if (commandName === "clear") {
+      newChat();
+      return;
+    }
+  }, [activeChatId, activeChat, language, setChats, setActiveChatId, setIsLoading, setChatMode, setLanguage, newChat]);
+
   const handleSendMessage = useCallback(async (msgText, msgAttachments = []) => {
     const hasContent = msgText.trim() || msgAttachments.length > 0;
     if (!hasContent || isLoading) return;
+
+    const trimmedText = msgText.trim();
+    if (trimmedText.startsWith("/") && msgAttachments.length === 0) {
+      await handleSlashCommand(trimmedText);
+      return;
+    }
 
     let fullText = msgText.trim();
     if (msgAttachments.length > 0) {
@@ -398,7 +511,7 @@ export default function InputBar() {
         )
       );
     }
-  }, [activeChatId, activeChat, chats, isLoading, language, setChats, setActiveChatId, setIsLoading, personas, activePersonaId]);
+  }, [activeChatId, activeChat, chats, isLoading, language, setChats, setActiveChatId, setIsLoading, personas, activePersonaId, handleSlashCommand]);
 
   const hasContent = text.trim() || attachments.length > 0;
 
@@ -472,10 +585,62 @@ export default function InputBar() {
 
   const inputBorder = inputFocused ? 'rgba(212,175,55,0.45)' : 'rgba(212,175,55,0.18)';
 
+  const slashQuery = text.startsWith("/") && !text.includes(" ") ? text.slice(1).toLowerCase() : null;
+  const slashMatches = slashQuery !== null
+    ? SLASH_COMMANDS.filter((cmd) => cmd.name.startsWith(slashQuery))
+    : [];
+
   return (
     <div style={{ padding: '16px 28px 22px 28px', flexShrink: 0 }}>
-      <div style={{ maxWidth: '780px', margin: '0 auto' }}>
-        
+      <div style={{ maxWidth: '780px', margin: '0 auto', position: 'relative' }}>
+
+        {slashMatches.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: 0,
+              right: 0,
+              marginBottom: '8px',
+              background: '#141414',
+              border: '1px solid rgba(212,175,55,0.22)',
+              borderRadius: '10px',
+              boxShadow: '0 10px 24px rgba(0,0,0,0.5)',
+              padding: '4px',
+              zIndex: 50,
+            }}
+          >
+            {slashMatches.map((cmd) => (
+              <button
+                key={cmd.name}
+                onClick={() => {
+                  setText(`/${cmd.name} `);
+                  inputRef.current?.focus();
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#d8cbb0',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  borderRadius: '7px',
+                }}
+                className="hover:bg-[#1e1a10] hover:text-[#e5c76b]"
+              >
+                <span style={{ fontWeight: 650, color: '#e5c76b' }}>{cmd.usage}</span>
+                <span style={{ color: '#a89878', fontSize: '12px' }}>{cmd.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Attachment preview strip */}
         {attachments.length > 0 && (
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
