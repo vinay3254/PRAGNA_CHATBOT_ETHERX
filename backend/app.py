@@ -12,6 +12,8 @@ import time
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from llm_service import LLMService
 import config
 from services import memory_db
@@ -441,6 +443,20 @@ def _generate_with_runway(prompt: str, size: str):
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
 CORS(app, origins=config.CORS_ALLOWED_ORIGINS, supports_credentials=True)
+
+# Rate limiter for unauthenticated, expensive-to-run endpoints (AI image/document
+# generation) - see config.AI_GENERATION_RATE_LIMIT / LIMITER_STORAGE_URI.
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    storage_uri=config.LIMITER_STORAGE_URI,
+)
+
+
+@app.errorhandler(429)
+def _rate_limit_exceeded(e):
+    """Return JSON (matching every other route's error shape) instead of flask-limiter's default HTML page."""
+    return jsonify({'error': f'Rate limit exceeded: {e.description}. Please try again later.'}), 429
 
 # Initialize LLM service
 llm = LLMService()
@@ -1003,6 +1019,7 @@ def world_monitor_config():
 
 
 @app.route('/api/images/generate', methods=['POST'])
+@limiter.limit(config.AI_GENERATION_RATE_LIMIT)
 def generate_image():
     """Generate an AI image using configured provider (Runway/OpenAI/fallback)."""
     try:
@@ -2067,6 +2084,7 @@ GENERATED_DOCS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'g
 
 
 @app.route('/api/documents/generate', methods=['POST'])
+@limiter.limit(config.AI_GENERATION_RATE_LIMIT)
 def generate_document():
     """Generate a downloadable Word/Excel/PDF/PowerPoint document from a chat prompt."""
     try:

@@ -25,6 +25,17 @@ CORS_ALLOWED_ORIGINS = (
     else [origin.strip() for origin in _cors_origins_env.split(',') if origin.strip()]
 )
 
+# Per-client-IP rate limit for the unauthenticated AI generation endpoints
+# (/api/images/generate, /api/documents/generate) - each call triggers an LLM
+# request and/or a disk write, so these need a cap independent of auth.
+# Format is flask-limiter syntax, e.g. "10 per hour", "5 per minute".
+AI_GENERATION_RATE_LIMIT = os.getenv('AI_GENERATION_RATE_LIMIT', '10 per hour')
+
+# Where flask-limiter stores counters. In-memory is fine for a single
+# instance; set to a shared store (e.g. redis://host:6379) for multi-instance
+# deployments, otherwise each instance enforces its own separate limit.
+LIMITER_STORAGE_URI = os.getenv('LIMITER_STORAGE_URI', 'memory://')
+
 # Development Mode - Enables mock responses for testing without valid API keys
 # WARNING: Should be False in production to ensure real API calls
 DEVELOPMENT_MODE = os.getenv('DEVELOPMENT_MODE', 'False').lower() == 'true'
