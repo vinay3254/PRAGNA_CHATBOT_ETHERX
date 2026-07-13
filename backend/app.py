@@ -1663,10 +1663,11 @@ def chat_stream():
         chat_mode = data.get('chat_mode', 'general')
         model_override = data.get('model_override')
         fallback_models = data.get('fallback_models')
-        
+        persona_system_prompt = data.get('persona_system_prompt')
+
         if not user_message:
             return jsonify({'error': 'Message cannot be empty'}), 400
-        
+
         logger.info(f"Received streaming request: {user_message[:50]}... (language: {language}, mode: {chat_mode})")
 
         def stream_orchestrated_chunks():
@@ -1678,6 +1679,7 @@ def chat_stream():
                 chat_mode=chat_mode,
                 model_override=model_override,
                 fallback_models=fallback_models,
+                persona_system_prompt=persona_system_prompt,
             )
 
             actions = result.get('actions', [])

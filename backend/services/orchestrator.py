@@ -24,6 +24,7 @@ class AIOrchestrator:
         chat_mode: str = "general",
         model_override: Optional[str] = None,
         fallback_models: Optional[List[str]] = None,
+        persona_system_prompt: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Process one request and return a unified response envelope."""
         route = self._route_agent_action(message)
@@ -117,6 +118,7 @@ class AIOrchestrator:
             chat_mode,
             model_override=model_override,
             fallback_models=fallback_models,
+            persona_system_prompt=persona_system_prompt,
         )
         return {
             "response": ai_response,

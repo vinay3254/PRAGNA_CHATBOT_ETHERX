@@ -190,6 +190,7 @@ class LLMService:
         chat_mode: str = 'general',
         model_override: Optional[str] = None,
         fallback_models: Optional[List[str]] = None,
+        persona_system_prompt: Optional[str] = None,
     ) -> tuple:
         """
         Get AI response for a user message
@@ -307,18 +308,24 @@ class LLMService:
                 user_profile_memory=user_profile_memory,
             )
             
-            # Derive user style profile from history and prepend style adaptation directive
-            style = style_profile.get_style_profile(user_id, max_messages=self.max_history)
-            
-            # Detect tone from CURRENT message and override profile tone if detected
-            current_tone = tone_detector.detect_tone(message)
-            if current_tone != "neutral":
-                style["tone"] = current_tone
-                logger.info(f"Detected message tone: {current_tone}. Overriding profile tone.")
-            
-            # Pass language and chat_mode to style_system_message so it includes both style AND mode prefix
-            style_msg = style_profile.style_system_message(style, language, chat_mode)
-            prompt_messages.insert(0, {"role": "system", "content": style_msg})
+            if persona_system_prompt:
+                # An active custom persona replaces the auto-inferred style message entirely,
+                # rather than stacking both and risking conflicting instructions.
+                system_msg = persona_system_prompt
+            else:
+                # Derive user style profile from history and prepend style adaptation directive
+                style = style_profile.get_style_profile(user_id, max_messages=self.max_history)
+
+                # Detect tone from CURRENT message and override profile tone if detected
+                current_tone = tone_detector.detect_tone(message)
+                if current_tone != "neutral":
+                    style["tone"] = current_tone
+                    logger.info(f"Detected message tone: {current_tone}. Overriding profile tone.")
+
+                # Pass language and chat_mode to style_system_message so it includes both style AND mode prefix
+                system_msg = style_profile.style_system_message(style, language, chat_mode)
+
+            prompt_messages.insert(0, {"role": "system", "content": system_msg})
             
             logger.info("Calling generate_completion: model_override=%s, fallback_models=%s", model_override, fallback_models)
             
