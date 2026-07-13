@@ -16,6 +16,15 @@ PORT = int(os.getenv('FLASK_PORT', 5001))
 # DEBUG should be False in production - only enable for local development
 DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
 
+# CORS: comma-separated list of allowed frontend origins in production
+# (e.g. "https://etherx-frontend.onrender.com"). Defaults to "*" so local
+# dev keeps working with no configuration; set explicitly in production.
+_cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '*').strip()
+CORS_ALLOWED_ORIGINS = (
+    '*' if _cors_origins_env == '*'
+    else [origin.strip() for origin in _cors_origins_env.split(',') if origin.strip()]
+)
+
 # Development Mode - Enables mock responses for testing without valid API keys
 # WARNING: Should be False in production to ensure real API calls
 DEVELOPMENT_MODE = os.getenv('DEVELOPMENT_MODE', 'False').lower() == 'true'
@@ -224,6 +233,24 @@ MODEL_REGISTRY = {
         'display_name': 'Qwen2.5 Coder 14B (Ollama Local)',
         'open_weights': True,
         'quality_tier': 'high',
+        'speed_tier': 'medium',
+        'cost_tier': 'local',
+    },
+    'ollama:nemotron-3-super:cloud': {
+        'provider': 'ollama',
+        'model': 'nemotron-3-super:cloud',
+        'display_name': 'Nemotron 3 Super Cloud (Ollama Local)',
+        'open_weights': True,
+        'quality_tier': 'high',
+        'speed_tier': 'medium',
+        'cost_tier': 'local',
+    },
+    'ollama:adithyak/mysql-index-advisor:latest': {
+        'provider': 'ollama',
+        'model': 'adithyak/mysql-index-advisor:latest',
+        'display_name': 'MySQL Index Advisor (Ollama Local)',
+        'open_weights': True,
+        'quality_tier': 'good',
         'speed_tier': 'medium',
         'cost_tier': 'local',
     },

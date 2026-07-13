@@ -440,7 +440,7 @@ def _generate_with_runway(prompt: str, size: str):
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
-CORS(app)
+CORS(app, origins=config.CORS_ALLOWED_ORIGINS, supports_credentials=True)
 
 # Initialize LLM service
 llm = LLMService()
