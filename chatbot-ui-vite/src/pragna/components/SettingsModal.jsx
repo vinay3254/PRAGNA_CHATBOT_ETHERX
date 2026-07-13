@@ -1,10 +1,10 @@
 import { useState, useEffect, useContext } from 'react'
 import { ChatContext } from '../../context/ChatContext'
-import { getModelsCatalog } from '../../api/api'
+import { getModelsCatalog, createPersona, updatePersona, deletePersona } from '../../api/api'
 
 const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
   const [activeTab, setActiveTab] = useState('General')
-  const { theme, setTheme } = useContext(ChatContext)
+  const { theme, setTheme, personas, refreshPersonas } = useContext(ChatContext)
 
   // Settings States matching mockup
   const [userName, setUserName] = useState(() => userProfile?.username || localStorage.getItem('authUsername') || 'vianan')
@@ -22,6 +22,13 @@ const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
   const [modelCatalog, setModelCatalog] = useState(null)
   const [modelCatalogError, setModelCatalogError] = useState(false)
   const modelCatalogLoading = isOpen && activeTab === 'Model' && !modelCatalog && !modelCatalogError
+
+  const [personaFormOpen, setPersonaFormOpen] = useState(false)
+  const [editingPersonaId, setEditingPersonaId] = useState(null)
+  const [personaName, setPersonaName] = useState('')
+  const [personaPrompt, setPersonaPrompt] = useState('')
+  const [personaSaving, setPersonaSaving] = useState(false)
+  const [personaError, setPersonaError] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -42,9 +49,73 @@ const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
       })
   }, [isOpen, activeTab, modelCatalog, modelCatalogError])
 
+  useEffect(() => {
+    if (isOpen && activeTab === 'Personas') {
+      refreshPersonas()
+    }
+    // refreshPersonas is intentionally omitted below: it's re-created on every ChatProvider render
+    // (not memoized), so including it would re-trigger this effect on every fetch and cause a
+    // request loop. Only isOpen/activeTab transitions should refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeTab])
+
   const handleModelProfileChange = (profile) => {
     setModelProfile(profile)
     localStorage.setItem('pragna_model_profile', profile)
+  }
+
+  const openNewPersonaForm = () => {
+    setEditingPersonaId(null)
+    setPersonaName('')
+    setPersonaPrompt('')
+    setPersonaError('')
+    setPersonaFormOpen(true)
+  }
+
+  const openEditPersonaForm = (persona) => {
+    setEditingPersonaId(persona.id)
+    setPersonaName(persona.name)
+    setPersonaPrompt(persona.system_prompt)
+    setPersonaError('')
+    setPersonaFormOpen(true)
+  }
+
+  const closePersonaForm = () => {
+    setPersonaFormOpen(false)
+    setEditingPersonaId(null)
+  }
+
+  const savePersona = async () => {
+    const name = personaName.trim()
+    const systemPrompt = personaPrompt.trim()
+    if (!name || !systemPrompt) {
+      setPersonaError('Both a name and a system prompt are required.')
+      return
+    }
+    setPersonaSaving(true)
+    setPersonaError('')
+    try {
+      if (editingPersonaId) {
+        await updatePersona(editingPersonaId, { name, system_prompt: systemPrompt })
+      } else {
+        await createPersona({ name, system_prompt: systemPrompt })
+      }
+      await refreshPersonas()
+      closePersonaForm()
+    } catch (err) {
+      setPersonaError(err.message || 'Failed to save persona.')
+    } finally {
+      setPersonaSaving(false)
+    }
+  }
+
+  const removePersona = async (persona) => {
+    try {
+      await deletePersona(persona.id)
+      await refreshPersonas()
+    } catch (err) {
+      console.warn('Failed to delete persona:', err)
+    }
   }
 
   if (!isOpen) return null
@@ -108,6 +179,7 @@ const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
     { label: 'Billing', icon: 'card' },
     { label: 'Usage', icon: 'chart' },
     { label: 'Model', icon: 'puzzle' },
+    { label: 'Personas', icon: 'account' },
     { label: 'Capabilities', icon: 'puzzle' },
     { label: 'Connectors', icon: 'puzzle' },
     { label: 'Pragna Code', icon: 'code' },
@@ -564,6 +636,97 @@ const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* PERSONAS TAB */}
+          {activeTab === 'Personas' && (
+            <div style={{ animation: 'fadeUp 0.15s ease' }}>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 700, color: '#f0e6d3' }}>Personas</h2>
+              <p style={{ margin: '0 0 22px 0', fontSize: '13.5px', color: '#a89878', lineHeight: 1.6 }}>Custom system prompts you can switch between per chat, from the picker next to the mode badge.</p>
+
+              {!personaFormOpen && (
+                <button
+                  onClick={openNewPersonaForm}
+                  style={{ padding: '9px 18px', borderRadius: '10px', border: '1px solid rgba(212,175,55,0.35)', background: 'rgba(212,175,55,0.10)', color: '#e5c76b', fontSize: '13px', fontWeight: 650, cursor: 'pointer', marginBottom: '22px' }}
+                >
+                  + Add persona
+                </button>
+              )}
+
+              {personaFormOpen && (
+                <div style={{ marginBottom: '26px', padding: '16px', borderRadius: '12px', border: '1px solid #2d2a24', background: '#1a1a1a' }}>
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '13px', color: '#a89878', marginBottom: '6px' }}>Name</div>
+                    <input
+                      value={personaName}
+                      onChange={(e) => setPersonaName(e.target.value)}
+                      placeholder="e.g. Concise Coder"
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #2d2a24', background: '#141414', color: '#f0e6d3', fontFamily: 'inherit', fontSize: '14px' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '13px', color: '#a89878', marginBottom: '6px' }}>System prompt</div>
+                    <textarea
+                      value={personaPrompt}
+                      onChange={(e) => setPersonaPrompt(e.target.value)}
+                      placeholder="e.g. Respond with terse, code-first answers. Skip pleasantries."
+                      rows="4"
+                      style={{ width: '100%', resize: 'vertical', padding: '11px 14px', borderRadius: '10px', border: '1px solid #2d2a24', background: '#141414', color: '#f0e6d3', fontFamily: 'inherit', fontSize: '14px', lineHeight: 1.5 }}
+                    />
+                  </div>
+                  {personaError && (
+                    <div style={{ fontSize: '12.5px', color: '#e8a598', marginBottom: '12px' }}>{personaError}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={savePersona}
+                      disabled={personaSaving}
+                      style={{ padding: '9px 18px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #e5c76b, #b8860b)', color: '#0a0a0a', fontSize: '13px', fontWeight: 650, cursor: personaSaving ? 'default' : 'pointer', opacity: personaSaving ? 0.6 : 1 }}
+                    >
+                      {personaSaving ? 'Saving…' : editingPersonaId ? 'Save changes' : 'Create persona'}
+                    </button>
+                    <button
+                      onClick={closePersonaForm}
+                      style={{ padding: '9px 18px', borderRadius: '10px', border: '1px solid #2d2a24', background: 'transparent', color: '#a89878', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {personas.length === 0 && !personaFormOpen && (
+                <div style={{ fontSize: '13.5px', color: '#a89878' }}>No personas yet.</div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {personas.map((persona) => (
+                  <div
+                    key={persona.id}
+                    style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '14px', padding: '14px', borderRadius: '10px', border: '1px solid #2d2a24', background: '#1a1a1a' }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 650, color: '#f0e6d3', marginBottom: '4px' }}>{persona.name}</div>
+                      <div style={{ fontSize: '12.5px', color: '#a89878', maxWidth: '460px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{persona.system_prompt}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      <button
+                        onClick={() => openEditPersonaForm(persona)}
+                        style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #2d2a24', background: 'transparent', color: '#d8cbb0', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => removePersona(persona)}
+                        style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(220,110,100,0.35)', background: 'rgba(220,110,100,0.10)', color: '#e8a598', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
