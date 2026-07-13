@@ -71,6 +71,8 @@ function App({ onLogout, userProfile }) {
     sidebarOpen,
     toggleSidebar,
     sidebarSearchInputRef,
+    personas,
+    activePersonaId,
   } = useContext(ChatContext)
 
   useEffect(() => {
@@ -185,12 +187,15 @@ function App({ onLogout, userProfile }) {
         return
       }
 
+      const activePersona = personas.find((p) => p.id === activePersonaId)
+
       let sawResponse = false
       await sendOrchestratedMessageStream({
         text: prompt,
         language: normalizeLanguageCode(language),
         user_id: targetChatId,
         chatMode,
+        personaSystemPrompt: activePersona?.system_prompt,
         onChunk: (chunk) => {
           sawResponse = true
           setChats((prev) =>
@@ -257,7 +262,7 @@ function App({ onLogout, userProfile }) {
         )
       )
     }
-  }, [activeChatId, chatMode, chats, isLoading, language, setActiveChatId, setChats, setIsLoading])
+  }, [activeChatId, activePersonaId, chatMode, chats, isLoading, language, personas, setActiveChatId, setChats, setIsLoading])
 
   const handleNewChat = useCallback(() => {
     newChat()
