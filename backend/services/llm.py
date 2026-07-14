@@ -402,7 +402,7 @@ def generate_completion(
     if config.OPENAI_API_KEY:
         emergency_candidates.append(f"openai:{config.OPENAI_MODEL}")
     if config.OLLAMA_ENABLED:
-        emergency_candidates.extend(["ollama:qwen3:4b", "ollama:qwen3:8b"])
+        emergency_candidates.append(f"ollama:{config.OLLAMA_MODEL}")
     if config.GROQ_API_KEY:
         emergency_candidates.append(f"groq:{config.GROQ_MODEL}")
 

@@ -12,6 +12,28 @@ services:
     # block (the only place that reads config.PORT) never runs.
     startCommand: gunicorn app:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
+      - key: LLM_PROVIDER
+        value: ollama_only # Ollama is primary. Render can't host Ollama itself -
+                            # point OLLAMA_API_URL at an externally reachable
+                            # Ollama instance (VPS, RunPod, Fly.io, etc).
+      - key: OLLAMA_API_URL
+        sync: false # REQUIRED: URL of your externally hosted Ollama instance,
+                     # e.g. https://ollama.yourdomain.com or a Tailscale address.
+                     # Must be reachable from Render's network. Put auth in front
+                     # of it (Ollama itself has no built-in auth).
+      - key: OLLAMA_MODEL
+        value: Ravishka/Miku # must match a model already pulled (or a :cloud
+                              # model signed in) on the Ollama host. Matches
+                              # local backend/.env - change here if the host's
+                              # available models differ.
+      - key: DEFAULT_MODEL_KEY
+        value: ollama:Ravishka/Miku
+      - key: DEFAULT_MODEL_FALLBACKS
+        value: ollama:Ravishka/Miku,ollama:jensonodigie/Jenteck-GPT,ollama:qwen3-coder-next:cloud
+      - key: CLASSIFIER_MODEL_KEY
+        value: ollama:Ravishka/Miku
+      - key: CLASSIFIER_FALLBACKS
+        value: ollama:Ravishka/Miku,ollama:jensonodigie/Jenteck-GPT,ollama:qwen3-coder-next:cloud
       - key: GROQ_API_KEY
         sync: false # You will set this in Render dashboard
       - key: SERPER_API_KEY
