@@ -62,6 +62,12 @@ services:
         sync: false # Set to the etherx-frontend URL once known (e.g.
                      # https://etherx-frontend.onrender.com). Defaults to "*"
                      # (any origin) if left unset.
+      - key: RAG_ENABLED
+        value: "False" # REQUIRED on Render's free tier (~512MB RAM): True
+                        # eagerly loads sentence-transformers/torch/faiss in
+                        # both gunicorn workers at boot (~700MB+ each),
+                        # which times out Render's port-bind scan before the
+                        # app ever comes up. Main chat doesn't use RAG anyway.
       - key: FLASK_DEBUG
         value: "False"
       - key: PYTHON_VERSION
