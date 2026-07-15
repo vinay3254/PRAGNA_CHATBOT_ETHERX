@@ -4,7 +4,6 @@ import pragnaLogo from '../../assets/pragna-logo-full.png'
 import ChatManagementAPI from '../../api/chatManagement'
 import RecentItem from './RecentItem'
 import { ChatContext } from '../../context/ChatContext'
-import { SUPPORTED_LANGUAGE_OPTIONS, normalizeLanguageCode } from '../../utils/language'
 
 const Sidebar = ({
   activeView,
@@ -19,7 +18,7 @@ const Sidebar = ({
   onClose,
   onOpenSettings,
 }) => {
-  const { language, setLanguage, folders, createFolder, renameFolder, deleteFolder, moveChatToFolder, toggleSidebar, sidebarSearchInputRef, duplicateChat } = useContext(ChatContext)
+  const { folders, createFolder, renameFolder, deleteFolder, moveChatToFolder, toggleSidebar, sidebarSearchInputRef, duplicateChat } = useContext(ChatContext)
 
   const [pinnedChats, setPinnedChats] = useState(new Set())
   const [renameDialogId, setRenameDialogId] = useState(null)
@@ -35,7 +34,6 @@ const Sidebar = ({
 
   // Menu popup states
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
 
   const userMenuRef = useRef(null)
   const userButtonRef = useRef(null)
@@ -49,7 +47,6 @@ const Sidebar = ({
         !userButtonRef.current?.contains(event.target)
       ) {
         setUserMenuOpen(false)
-        setLanguageMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -335,12 +332,6 @@ ${turns}
     { id: 'intelligence', label: 'Intelligence' },
     { id: 'agent', label: 'Agent' },
   ]
-
-  const handleLanguageSelect = (code) => {
-    setLanguage(normalizeLanguageCode(code))
-    setLanguageMenuOpen(false)
-    setUserMenuOpen(false)
-  }
 
   const filteredChats = recentChats.filter((chat) => {
     const query = searchQuery.toLowerCase()
@@ -755,10 +746,7 @@ ${turns}
             {/* Click-out backdrop */}
             <div
               style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-              onClick={() => {
-                setUserMenuOpen(false)
-                setLanguageMenuOpen(false)
-              }}
+              onClick={() => setUserMenuOpen(false)}
             />
 
             {/* Menu Popup */}
@@ -794,51 +782,6 @@ ${turns}
                 <span style={{ fontSize: '11px', color: '#6b6152' }}>Ctrl ⇧,</span>
               </button>
 
-              {/* Language toggle */}
-              <button
-                onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '11px',
-                  padding: '10px 12px',
-                  borderRadius: '9px',
-                  border: 'none',
-                  background: languageMenuOpen ? '#1e1a10' : 'transparent',
-                  color: languageMenuOpen ? '#e5c76b' : '#d8cbb0',
-                  fontSize: '13.5px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-                className="hover:bg-[#1e1a10] hover:text-[#e5c76b]"
-              >
-                <span style={{ display: 'flex', width: '16px', height: '16px', color: '#a89878', flexShrink: 0 }}>
-                  {gearIcon('globe')}
-                </span>
-                <span style={{ flex: 1 }}>Language</span>
-                <span style={{ color: '#6b6152', fontSize: '12px' }}>›</span>
-              </button>
-
-              {/* Other links */}
-              {['Get help', 'View all plans', 'Get apps', 'Learn more'].map((label, idx) => {
-                const iconNames = ['help', 'list', 'download', 'info']
-                return (
-                  <button
-                    key={label}
-                    onClick={() => setUserMenuOpen(false)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '11px', padding: '10px 12px', borderRadius: '9px', border: 'none', background: 'transparent', color: '#d8cbb0', fontSize: '13.5px', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#1e1a10] hover:text-[#e5c76b]"
-                  >
-                    <span style={{ display: 'flex', width: '16px', height: '16px', color: '#a89878', flexShrink: 0 }}>
-                      {gearIcon(iconNames[idx])}
-                    </span>
-                    <span style={{ flex: 1 }}>{label}</span>
-                  </button>
-                )
-              })}
-
               {/* Log out */}
               <button
                 onClick={() => {
@@ -854,62 +797,6 @@ ${turns}
                 <span style={{ flex: 1 }}>Log out</span>
               </button>
             </div>
-
-            {/* Language Flyout Submenu */}
-            {languageMenuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '68px',
-                  left: '262px',
-                  width: '220px',
-                  maxHeight: '380px',
-                  overflowY: 'auto',
-                  zIndex: 42,
-                  padding: '6px',
-                  borderRadius: '14px',
-                  background: '#141414',
-                  border: '1px solid rgba(212,175,55,0.22)',
-                  boxShadow: '0 20px 32px rgba(0,0,0,0.50)',
-                  animation: 'fadeUp 0.15s ease',
-                }}
-              >
-                {SUPPORTED_LANGUAGE_OPTIONS.map((item) => {
-                  const active = normalizeLanguageCode(language) === item.code
-                  return (
-                    <button
-                      key={item.code}
-                      onClick={() => handleLanguageSelect(item.code)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '10px',
-                        padding: '10px 12px',
-                        borderRadius: '9px',
-                        border: 'none',
-                        background: 'transparent',
-                        color: active ? '#e5c76b' : '#d8cbb0',
-                        fontSize: '13.5px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.12s ease',
-                      }}
-                      className="hover:bg-[#1e1a10] hover:text-[#e5c76b]"
-                    >
-                      <span>{item.label}</span>
-                      {active && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6L9 17l-5-5"></path>
-                        </svg>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
           </>
         )}
 
