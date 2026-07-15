@@ -5,26 +5,26 @@
 
 /* Black & Gold theme - Modern Professional Design */
 :root {
-  --gold: #d4af37;
-  --gold-light: #e5c76b;
-  --gold-muted: #b8860b;
-  --black: #0a0a0a;
-  --black-elevated: #141414;
-  --black-surface: #1a1a1a;
+  --gold: var(--pragna-accent);
+  --gold-light: var(--pragna-gold-soft);
+  --gold-muted: var(--pragna-gold-deep);
+  --black: var(--pragna-bg);
+  --black-elevated: var(--pragna-surface);
+  --black-surface: var(--pragna-surface-2);
 
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #141414;
+  --bg-primary: var(--pragna-bg);
+  --bg-secondary: var(--pragna-surface);
   --bg-tertiary: #1f1f1f;
-  --text-primary: #f0e6d3;
-  --text-secondary: #a89878;
-  --border-color: #2d2a24;
-  --accent-color: #d4af37;
-  --user-bubble: #1a1a1a;
+  --text-primary: var(--pragna-text);
+  --text-secondary: var(--pragna-text-muted);
+  --border-color: var(--pragna-border);
+  --accent-color: var(--pragna-accent);
+  --user-bubble: var(--pragna-surface-2);
   --bot-bubble: transparent;
-  --input-bg: #141414;
+  --input-bg: var(--pragna-surface);
   --icon-color: #c9a227;
-  --icon-color-hover: #e5c76b;
-  --icon-active: #d4af37;
+  --icon-color-hover: var(--pragna-gold-soft);
+  --icon-active: var(--pragna-accent);
 }
 
 body {
@@ -93,7 +93,7 @@ body {
   padding: 12px;
   border: 1px solid rgba(212, 175, 55, 0.25);
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06), rgba(20, 20, 20, 0.8));
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06), var(--pragna-surface));
 }
 
 .intel-panel-header {
@@ -145,7 +145,7 @@ body {
   border: 1px solid rgba(212, 175, 55, 0.18);
   border-radius: 8px;
   padding: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  background: #000000;
 }
 
 .intel-region-name {
@@ -175,7 +175,7 @@ body {
   border: 1px solid rgba(212, 175, 55, 0.16);
   border-radius: 8px;
   padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: #000000;
 }
 
 .intel-event-item:hover {

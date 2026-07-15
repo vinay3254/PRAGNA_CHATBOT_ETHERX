@@ -6,7 +6,7 @@ const SuggestionCard = ({ icon: Icon, title, description }) => {
       whileHover={{ y: -3 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       className="group relative flex flex-col items-start gap-3 p-5 rounded-2xl text-left
-        bg-[rgba(20,20,20,0.82)] backdrop-blur-sm border border-accent-500/[.18]
+        bg-black border border-accent-500/[.18]
         shadow-premium-sm hover:shadow-premium-hover hover:border-accent-500/40
         transition-colors duration-300"
     >

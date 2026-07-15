@@ -8,24 +8,43 @@
     --pragna-gold-soft: #e5c76b;
     --pragna-gold-deep: #b8860b;
     --pragna-bg: #0a0a0a;
-    --pragna-surface: #141414;
-    --pragna-surface-2: #1a1a1a;
+    --pragna-surface: #050505;
+    --pragna-surface-2: #0a0a0a;
     --pragna-border: #2d2a24;
     --pragna-text: #f0e6d3;
     --pragna-text-muted: #a89878;
     --pragna-text-soft: #c9bda2;
     --pragna-on-gold: #1a1405;
+    /* User-configurable (set via Settings > Profile), default to brand gold -
+       used by interactive/accent elements, NOT the fixed --pragna-gold
+       branding color (logo, wordmark). */
+    --pragna-accent: #d4af37;
+    --pragna-chat-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Light theme overrides - applied when ChatContext resolves the user's
+     theme preference ('system' follows the OS) to 'light' and sets
+     data-theme="light" on <html>. See src/context/ChatContext.jsx. */
+  [data-theme="light"] {
+    --pragna-bg: #f7f5ef;
+    --pragna-surface: #ffffff;
+    --pragna-surface-2: #f0ece0;
+    --pragna-border: #ddd4bf;
+    --pragna-text: #2a2415;
+    --pragna-text-muted: #7a6f58;
+    --pragna-text-soft: #4a4030;
   }
 
   html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    background: #0a0a0a;
-    color: #f0e6d3;
+    background: var(--pragna-bg);
+    color: var(--pragna-text);
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 
   * {
@@ -108,10 +127,9 @@
 
 /* Tailwind helper support classes */
 .glass-card {
-  background: rgba(20, 20, 20, 0.82);
-  backdrop-filter: blur(8px);
+  background: #000000;
   border: 1px solid rgba(212, 175, 55, 0.18);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
 }
 
 .pragna-shell {

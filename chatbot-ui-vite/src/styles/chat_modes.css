@@ -9,7 +9,7 @@
 .chat-mode-label {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #d4af37;
+  color: var(--pragna-accent);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   display: flex;
@@ -31,7 +31,7 @@
   justify-content: center;
   gap: 0.35rem;
   padding: 0.6rem 0.75rem;
-  background: rgba(30, 30, 30, 0.8);
+  background: #000000;
   border: 1.5px solid rgba(212, 175, 55, 0.35);
   border-radius: 6px;
   color: #d0d0d0;
@@ -47,14 +47,14 @@
 
 .chat-mode-btn:hover {
   background: rgba(212, 175, 55, 0.12);
-  border-color: #d4af37;
+  border-color: var(--pragna-accent);
   color: #fff;
   transform: translateY(-1px);
 }
 
 .chat-mode-btn.active {
   background: linear-gradient(135deg, rgba(212, 175, 55, 0.3), rgba(255, 193, 7, 0.2));
-  border-color: #d4af37;
+  border-color: var(--pragna-accent);
   color: #ffc107;
   box-shadow: 0 0 16px rgba(212, 175, 55, 0.45), inset 0 0 10px rgba(212, 175, 55, 0.15);
   font-weight: 700;

@@ -41,7 +41,7 @@
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid rgba(212, 175, 55, 0.26);
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(20, 20, 20, 0.8));
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), var(--pragna-surface));
   color: var(--gold-light);
 }
 
@@ -76,7 +76,7 @@
   text-align: left;
   border-radius: 14px;
   border: 1px solid rgba(212, 175, 55, 0.22);
-  background: linear-gradient(145deg, rgba(212, 175, 55, 0.06), rgba(26, 26, 26, 0.92));
+  background: #000000;
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -89,7 +89,7 @@
 .studio-suggestion-card:hover:not(:disabled) {
   transform: translateY(-2px);
   border-color: rgba(212, 175, 55, 0.5);
-  background: linear-gradient(145deg, rgba(212, 175, 55, 0.1), rgba(31, 31, 31, 0.96));
+  background: #0a0a0a;
 }
 
 .studio-suggestion-card:disabled {
@@ -151,7 +151,7 @@
 
 .suggestion-card {
   padding: 14px 18px;
-  background: rgba(26, 26, 26, 0.6);
+  background: #000000;
   border: 1px solid rgba(212, 175, 55, 0.3);
   border-radius: 12px;
   color: rgba(255, 255, 255, 0.8);
@@ -164,7 +164,7 @@
 }
 
 .suggestion-card:hover:not(:disabled) {
-  background: rgba(26, 26, 26, 0.8);
+  background: #050505;
   border-color: #ffd700;
   color: #ffd700;
   transform: translateY(-2px);

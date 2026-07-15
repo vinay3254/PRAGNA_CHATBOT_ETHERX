@@ -51,7 +51,7 @@
   border: 1px solid rgba(212, 175, 55, 0.18);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(212, 175, 55, 0.05);
+  background: #000000;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -104,7 +104,7 @@
 .dashboard-feed-card {
   border: 1px solid rgba(212, 175, 55, 0.22);
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(212, 175, 55, 0.04), rgba(20, 20, 20, 0.8));
+  background: #000000;
   padding: 12px;
 }
 
@@ -112,7 +112,7 @@
   grid-column: 1 / -1;
   border: 1px solid rgba(212, 175, 55, 0.22);
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(212, 175, 55, 0.04), rgba(20, 20, 20, 0.8));
+  background: #000000;
   padding: 12px;
 }
 
@@ -235,7 +235,7 @@
   border: 1px solid rgba(212, 175, 55, 0.18);
   border-radius: 8px;
   padding: 8px;
-  background: rgba(0, 0, 0, 0.18);
+  background: #000000;
 }
 
 .dashboard-feed-item:hover {
