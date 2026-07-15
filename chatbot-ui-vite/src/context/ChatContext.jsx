@@ -33,8 +33,26 @@ export function ChatProvider({ children }) {
     setLanguage(normalizeLanguageCode(nextLanguage));
   };
 
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem("pragna_theme") || "dark";
+  // Theme/accent switching was tried and removed (didn't look good) - the app
+  // is single fixed dark-gold theme now. Kept as constants rather than state
+  // so nothing can drift from this, and cleared any stale values a previous
+  // build may have left in localStorage.
+  const theme = "dark";
+  const setTheme = () => {};
+  const resolvedTheme = "dark";
+  const accentColor = "#d4af37";
+  const setAccentColor = () => {};
+  localStorage.removeItem("pragna_theme");
+  localStorage.removeItem("pragna_accent");
+
+  const CHAT_FONT_STACKS = {
+    "Default (Segoe UI)": "'Segoe UI', system-ui, -apple-system, sans-serif",
+    "Serif": "Georgia, 'Times New Roman', serif",
+    "Monospace": "'Cascadia Code', 'Consolas', 'Courier New', monospace",
+  };
+
+  const [chatFont, setChatFontState] = useState(() => {
+    return localStorage.getItem("pragna_chat_font") || "Default (Segoe UI)";
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -123,12 +141,17 @@ export function ChatProvider({ children }) {
     localStorage.setItem("pragna_language", language);
   }, [language]);
 
+  const setChatFont = (label) => {
+    setChatFontState(label);
+    localStorage.setItem("pragna_chat_font", label);
+  };
+
   useEffect(() => {
-    localStorage.setItem("pragna_theme", theme);
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", theme);
-    }
-  }, [theme]);
+    document.documentElement.style.setProperty(
+      "--pragna-chat-font",
+      CHAT_FONT_STACKS[chatFont] || CHAT_FONT_STACKS["Default (Segoe UI)"]
+    );
+  }, [chatFont]);
 
   // Auto-initialize first chat if none exist
   useEffect(() => {
@@ -229,6 +252,11 @@ export function ChatProvider({ children }) {
         setLanguage: setNormalizedLanguage,
         theme,
         setTheme,
+        resolvedTheme,
+        accentColor,
+        setAccentColor,
+        chatFont,
+        setChatFont,
         isLoading,
         setIsLoading,
         sidebarOpen,
