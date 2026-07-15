@@ -71,7 +71,6 @@ services:
   - type: web
     name: etherx-frontend
     runtime: static
-    plan: free
     rootDir: chatbot-ui-vite
     buildCommand: npm install && npm run build
     staticPublishPath: dist
