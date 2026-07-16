@@ -330,7 +330,6 @@ ${turns}
     { id: 'projects', label: 'Projects' },
     { id: 'gpts', label: 'GPTs' },
     { id: 'intelligence', label: 'Intelligence' },
-    { id: 'agent', label: 'Agent' },
   ]
 
   const filteredChats = recentChats.filter((chat) => {
