@@ -18,11 +18,16 @@ export default function App() {
   // The password reset email links to /reset-password?token=... - no router
   // in this app, so read it directly. Checked once on initial load; the
   // token is single-use anyway so there's no need for this to react to
-  // later URL changes within the same session.
+  // later URL changes within the same session. isResetPasswordRoute is
+  // tracked separately from the token itself so that visiting the path
+  // with a missing/stripped token still shows an explicit "invalid link"
+  // state instead of silently falling through to the normal app/login.
   const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('token'));
+  const [isResetPasswordRoute] = useState(() => window.location.pathname === '/reset-password');
 
   const clearResetToken = () => {
     const url = new URL(window.location.href);
+    url.pathname = '/';
     url.searchParams.delete('token');
     window.history.replaceState({}, '', url.pathname + url.search);
     window.location.reload();
@@ -62,7 +67,7 @@ export default function App() {
     setIsAuthenticated(false);
   };
 
-  if (resetToken) {
+  if (resetToken || isResetPasswordRoute) {
     return <ResetPassword token={resetToken} onDone={clearResetToken} />;
   }
 

@@ -54,11 +54,20 @@ export default function ResetPassword({ token, onDone }) {
       </div>
 
       <div className="auth-box">
-        <h1>Set New Password</h1>
+        <h1>{token ? 'Set New Password' : 'Invalid Reset Link'}</h1>
 
         {error && <div className="auth-error">{error}</div>}
 
-        {success ? (
+        {!token ? (
+          <>
+            <p style={{ color: 'var(--pragna-text-muted, #a89878)', fontSize: '14px', lineHeight: 1.6, margin: '4px 0 20px 0' }}>
+              This password reset link is missing or incomplete. Request a new one from the login page.
+            </p>
+            <button type="button" onClick={onDone} className="auth-btn">
+              Go to login
+            </button>
+          </>
+        ) : success ? (
           <>
             <p style={{ color: 'var(--pragna-text-muted, #a89878)', fontSize: '14px', lineHeight: 1.6, margin: '4px 0 20px 0' }}>
               Your password has been reset. You can log in with your new password now.
