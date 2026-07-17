@@ -1,14 +1,32 @@
 import { useState, useEffect, useContext } from 'react'
 import { ChatContext } from '../../context/ChatContext'
+import { changePassword, deleteAccount } from '../../api/api'
 
-const SettingsModal = ({ isOpen, onClose, userProfile }) => {
+const SettingsModal = ({ isOpen, onClose, onLogout, userProfile }) => {
   const [activeTab, setActiveTab] = useState('General')
-  const { chatFont, setChatFont } = useContext(ChatContext)
+  const { chatFont, setChatFont, chats, setChats } = useContext(ChatContext)
 
   // Settings States matching mockup
   const [userName, setUserName] = useState(() => userProfile?.username || localStorage.getItem('authUsername') || 'vianan')
   const [nickname, setNickname] = useState(() => localStorage.getItem('pragna_nickname') || '')
   const [instructions, setInstructions] = useState(() => localStorage.getItem('pragna_instructions') || '')
+
+  // Change password
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+
+  // Delete account
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  // Clear chat history
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -18,6 +36,74 @@ const SettingsModal = ({ isOpen, onClose, userProfile }) => {
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
   }, [isOpen, onClose])
+
+  const handleChangePassword = async () => {
+    setPasswordError('')
+    setPasswordSuccess('')
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Fill in all three fields.')
+      return
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match.')
+      return
+    }
+    setPasswordSaving(true)
+    try {
+      await changePassword(currentPassword, newPassword)
+      setPasswordSuccess('Password updated.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      setPasswordError(err.message || 'Failed to change password.')
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleteError('')
+    if (!deletePassword) {
+      setDeleteError('Enter your password to confirm.')
+      return
+    }
+    setDeleting(true)
+    try {
+      await deleteAccount(deletePassword)
+      onClose()
+      onLogout?.()
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete account.')
+      setDeleting(false)
+    }
+  }
+
+  const handleClearHistory = () => {
+    setChats([])
+    setClearConfirmOpen(false)
+  }
+
+  const handleExportData = () => {
+    const payload = {
+      exported_at: new Date().toISOString(),
+      username: userName,
+      chats,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pragna-chats-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   if (!isOpen) return null
 
@@ -220,6 +306,143 @@ const SettingsModal = ({ isOpen, onClose, userProfile }) => {
                   <option>Monospace</option>
                 </select>
               </div>
+
+              <div style={{ height: '1px', background: 'var(--pragna-border)', margin: '30px 0 26px 0' }}></div>
+
+              <h3 style={{ margin: '0 0 18px 0', fontSize: '15px', fontWeight: 700, color: 'var(--pragna-text)' }}>Account</h3>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '22px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--pragna-text-muted)', width: '110px', flexShrink: 0 }}>Email</div>
+                <div style={{ fontSize: '14px', color: 'var(--pragna-text)' }}>{userProfile?.email || localStorage.getItem('authEmail') || '—'}</div>
+              </div>
+
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 650, color: 'var(--pragna-text)', marginBottom: '12px' }}>Change password</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '360px' }}>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Current password"
+                    style={{ padding: '11px 14px', borderRadius: '10px', border: '1px solid var(--pragna-border)', background: 'var(--pragna-surface-2)', color: 'var(--pragna-text)', fontFamily: 'inherit', fontSize: '14px' }}
+                  />
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="New password (min 8 characters)"
+                    style={{ padding: '11px 14px', borderRadius: '10px', border: '1px solid var(--pragna-border)', background: 'var(--pragna-surface-2)', color: 'var(--pragna-text)', fontFamily: 'inherit', fontSize: '14px' }}
+                  />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    style={{ padding: '11px 14px', borderRadius: '10px', border: '1px solid var(--pragna-border)', background: 'var(--pragna-surface-2)', color: 'var(--pragna-text)', fontFamily: 'inherit', fontSize: '14px' }}
+                  />
+                  {passwordError && (
+                    <div style={{ fontSize: '12.5px', color: '#e8a598' }}>{passwordError}</div>
+                  )}
+                  {passwordSuccess && (
+                    <div style={{ fontSize: '12.5px', color: '#8fd19e' }}>{passwordSuccess}</div>
+                  )}
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={passwordSaving}
+                    style={{ alignSelf: 'flex-start', padding: '9px 18px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, var(--pragna-gold-soft), var(--pragna-gold-deep))', color: 'var(--pragna-on-gold)', fontWeight: 650, fontSize: '13.5px', cursor: passwordSaving ? 'default' : 'pointer', opacity: passwordSaving ? 0.7 : 1 }}
+                  >
+                    {passwordSaving ? 'Updating…' : 'Update password'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ height: '1px', background: 'var(--pragna-border)', margin: '30px 0 26px 0' }}></div>
+
+              <h3 style={{ margin: '0 0 18px 0', fontSize: '15px', fontWeight: 700, color: 'var(--pragna-text)' }}>Data</h3>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--pragna-text-muted)', width: '110px', flexShrink: 0 }}>Export chats</div>
+                <button
+                  onClick={handleExportData}
+                  style={{ padding: '9px 16px', borderRadius: '10px', border: '1px solid var(--pragna-border)', background: 'var(--pragna-surface-2)', color: 'var(--pragna-text)', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                  className="hover:bg-[var(--pragna-surface)]"
+                >
+                  Download as JSON
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--pragna-text-muted)', width: '110px', flexShrink: 0 }}>Chat history</div>
+                {!clearConfirmOpen ? (
+                  <button
+                    onClick={() => setClearConfirmOpen(true)}
+                    style={{ padding: '9px 16px', borderRadius: '10px', border: '1px solid var(--pragna-border)', background: 'var(--pragna-surface-2)', color: 'var(--pragna-text)', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                    className="hover:bg-[var(--pragna-surface)]"
+                  >
+                    Clear all chats
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '12.5px', color: 'var(--pragna-text-muted)' }}>Delete all {chats.length} chat{chats.length === 1 ? '' : 's'}? This can't be undone.</span>
+                    <button
+                      onClick={handleClearHistory}
+                      style={{ padding: '7px 14px', borderRadius: '9px', border: 'none', background: '#c0392b', color: '#fff', fontWeight: 650, fontSize: '12.5px', cursor: 'pointer' }}
+                    >
+                      Yes, clear
+                    </button>
+                    <button
+                      onClick={() => setClearConfirmOpen(false)}
+                      style={{ padding: '7px 14px', borderRadius: '9px', border: '1px solid var(--pragna-border)', background: 'transparent', color: 'var(--pragna-text-muted)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ height: '1px', background: 'var(--pragna-border)', margin: '30px 0 26px 0' }}></div>
+
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 700, color: '#e8a598' }}>Danger zone</h3>
+              <p style={{ margin: '0 0 16px 0', fontSize: '12.5px', color: 'var(--pragna-text-muted)' }}>
+                Permanently deletes your account, all chats, and all personas. This cannot be undone.
+              </p>
+
+              {!deleteConfirmOpen ? (
+                <button
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  style={{ padding: '9px 16px', borderRadius: '10px', border: '1px solid rgba(220,110,100,0.4)', background: 'rgba(180,60,60,0.12)', color: '#e8a598', fontWeight: 650, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  Delete account
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '360px' }}>
+                  <input
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="Enter your password to confirm"
+                    style={{ padding: '11px 14px', borderRadius: '10px', border: '1px solid rgba(220,110,100,0.4)', background: 'var(--pragna-surface-2)', color: 'var(--pragna-text)', fontFamily: 'inherit', fontSize: '14px' }}
+                  />
+                  {deleteError && (
+                    <div style={{ fontSize: '12.5px', color: '#e8a598' }}>{deleteError}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleting}
+                      style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: '#c0392b', color: '#fff', fontWeight: 650, fontSize: '13px', cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.7 : 1 }}
+                    >
+                      {deleting ? 'Deleting…' : 'Permanently delete my account'}
+                    </button>
+                    <button
+                      onClick={() => { setDeleteConfirmOpen(false); setDeletePassword(''); setDeleteError('') }}
+                      style={{ padding: '9px 16px', borderRadius: '10px', border: '1px solid var(--pragna-border)', background: 'transparent', color: 'var(--pragna-text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

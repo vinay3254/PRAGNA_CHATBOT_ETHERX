@@ -414,6 +414,32 @@ export const deletePersona = async (id) => {
   return data;
 };
 
+export const changePassword = async (currentPassword, newPassword) => {
+  const response = await fetch(`${API_BASE}/api/auth/change-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ..._authHeaders() },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to change password.");
+  }
+  return data;
+};
+
+export const deleteAccount = async (password) => {
+  const response = await fetch(`${API_BASE}/api/auth/account`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ..._authHeaders() },
+    body: JSON.stringify({ password }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to delete account.");
+  }
+  return data;
+};
+
 
 // ── Pragna Code Agent ────────────────────────────────────────────────────────
 

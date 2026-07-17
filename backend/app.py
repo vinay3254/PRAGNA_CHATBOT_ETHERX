@@ -1976,6 +1976,49 @@ def verify_token():
         logger.error(f"Verify error: {e}")
         return jsonify({'error': 'Token verification failed'}), 500
 
+@app.route('/api/auth/change-password', methods=['POST'])
+@require_auth
+def change_password():
+    """Change the current user's password."""
+    try:
+        data = request.json or {}
+        current_password = data.get('current_password', '')
+        new_password = data.get('new_password', '')
+
+        if not current_password or not new_password:
+            return jsonify({'error': 'current_password and new_password are required'}), 400
+
+        error = auth_service.change_password(request.user_id, current_password, new_password)
+        if error:
+            return jsonify({'error': error}), 400
+
+        return jsonify({'message': 'Password updated successfully'}), 200
+
+    except Exception as e:
+        logger.error(f"Change password error: {e}")
+        return jsonify({'error': 'Failed to change password'}), 500
+
+@app.route('/api/auth/account', methods=['DELETE'])
+@require_auth
+def delete_account():
+    """Permanently delete the current user's account and all their data."""
+    try:
+        data = request.json or {}
+        password = data.get('password', '')
+
+        if not password:
+            return jsonify({'error': 'password is required'}), 400
+
+        error = auth_service.delete_account(request.user_id, password)
+        if error:
+            return jsonify({'error': error}), 400
+
+        return jsonify({'message': 'Account deleted'}), 200
+
+    except Exception as e:
+        logger.error(f"Delete account error: {e}")
+        return jsonify({'error': 'Failed to delete account'}), 500
+
 @app.route('/api/profile', methods=['GET'])
 @require_auth
 def get_profile():

@@ -123,10 +123,56 @@ class Database:
         user = c.fetchone()
         conn.close()
         return dict(user) if user else None
-    
+
+    def get_user_by_id(self, user_id):
+        """Get user by id"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        c.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+        user = c.fetchone()
+        conn.close()
+        return dict(user) if user else None
+
     def verify_password(self, stored_hash, password):
         """Verify password against stored hash"""
         return bcrypt.checkpw(password.encode(), stored_hash.encode())
+
+    def update_password(self, user_id, new_password):
+        """Hash and store a new password for a user"""
+        password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        conn = self.get_connection()
+        c = conn.cursor()
+        c.execute(
+            'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            (password_hash, user_id),
+        )
+        conn.commit()
+        updated = c.rowcount > 0
+        conn.close()
+        return updated
+
+    def delete_user(self, user_id):
+        """Permanently delete a user and all their data.
+
+        SQLite foreign keys aren't enforced here (no PRAGMA foreign_keys=ON),
+        so child rows are deleted explicitly in dependency order rather than
+        relying on cascade.
+        """
+        conn = self.get_connection()
+        c = conn.cursor()
+        c.execute(
+            'DELETE FROM messages WHERE conversation_id IN '
+            '(SELECT id FROM conversations WHERE user_id = ?)',
+            (user_id,),
+        )
+        c.execute('DELETE FROM conversations WHERE user_id = ?', (user_id,))
+        c.execute('DELETE FROM api_usage WHERE user_id = ?', (user_id,))
+        c.execute('DELETE FROM personas WHERE user_id = ?', (user_id,))
+        c.execute('DELETE FROM users WHERE id = ?', (user_id,))
+        conn.commit()
+        deleted = c.rowcount > 0
+        conn.close()
+        return deleted
     
     # CONVERSATION MANAGEMENT
     def create_conversation(self, user_id, title, language='en'):
