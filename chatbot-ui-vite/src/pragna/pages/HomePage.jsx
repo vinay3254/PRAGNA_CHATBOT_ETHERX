@@ -91,6 +91,28 @@ const HomePage = ({ onUsePrompt, userProfile }) => {
         })}
       </div>
 
+      {tier === 'Pro' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            maxWidth: 'min(90vw, 620px)',
+            padding: '14px 18px',
+            borderRadius: '14px',
+            marginBottom: '28px',
+            background: 'rgba(212,175,55,0.08)',
+            border: '1px solid rgba(212,175,55,0.3)',
+            color: 'var(--pragna-text)',
+          }}
+        >
+          <span style={{ display: 'flex', flexShrink: 0, color: 'var(--pragna-gold-soft)' }}>{proIcon}</span>
+          <span style={{ fontSize: '13.5px', lineHeight: 1.5 }}>
+            <strong style={{ color: 'var(--pragna-gold-soft)' }}>Pragna Pro is a future enhancement.</strong> It's not available yet - we're still building it out. Stick with Pragna Basic for now.
+          </span>
+        </div>
+      )}
+
       {/* Explore cards grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 260px))', gap: '16px', maxWidth: 'min(90vw, 820px)', justifyContent: 'center' }}>
         {exploreCardDefs.map((card, idx) => {
