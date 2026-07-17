@@ -294,8 +294,6 @@ ${turns}
         return icon([], [r({ x: 3, y: 3, width: 7, height: 7, rx: 1, key: 'r1' }), r({ x: 14, y: 3, width: 7, height: 7, rx: 1, key: 'r2' }), r({ x: 3, y: 14, width: 7, height: 7, rx: 1, key: 'r3' }), r({ x: 14, y: 14, width: 7, height: 7, rx: 1, key: 'r4' })])
       case 'gpts':
         return icon(['M13 2L3 14h9l-1 8 10-12h-9l1-8z'])
-      case 'intelligence':
-        return icon(['M2 12h20', 'M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'], c({ cx: 12, cy: 12, r: 10 }))
       case 'compare':
         return icon([], [r({ x: 3, y: 4, width: 8, height: 16, rx: 1.5, key: 'r1' }), r({ x: 13, y: 4, width: 8, height: 16, rx: 1.5, key: 'r2' })])
       case 'agent':
@@ -335,7 +333,6 @@ ${turns}
     { id: 'projects', label: 'Projects' },
     { id: 'gpts', label: 'GPTs' },
     { id: 'compare', label: 'Compare' },
-    { id: 'intelligence', label: 'Intelligence' },
   ]
 
   const filteredChats = recentChats.filter((chat) => {

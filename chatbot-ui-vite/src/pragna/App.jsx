@@ -10,7 +10,6 @@ import ComparePage from './pages/ComparePage'
 import ChatWindow from '../components/chat/ChatWindow'
 import InputBar from '../components/input/InputBar'
 import GlobalDashboard from '../components/dashboard/GlobalDashboard'
-import WorldMonitorDashboard from '../components/dashboard/WorldMonitorDashboard'
 import AgentPanel from '../components/agent/AgentPanel'
 import SettingsModal from './components/SettingsModal'
 import ShortcutsHelpModal from './components/ShortcutsHelpModal'
@@ -367,10 +366,6 @@ function App({ onLogout, userProfile }) {
 
     if (activeView === 'compare') {
       return <ComparePage />
-    }
-
-    if (activeView === 'intelligence') {
-      return <WorldMonitorDashboard />
     }
 
     if (activeView === 'agent') {
