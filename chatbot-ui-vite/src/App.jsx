@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Login from "./components/auth/Login";
 import ResetPassword from "./components/auth/ResetPassword";
+import SharedChatView from "./components/chat/SharedChatView";
 import PragnaApp from "./pragna/App";
 import { ChatProvider } from "./context/ChatContext";
 
@@ -25,11 +26,25 @@ export default function App() {
   const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('token'));
   const [isResetPasswordRoute] = useState(() => window.location.pathname === '/reset-password');
 
+  // /share/<token> is a public read-only link - viewable while logged out,
+  // so it's checked before the auth gate below, same as the reset-password route.
+  const [shareToken] = useState(() => {
+    const match = window.location.pathname.match(/^\/share\/([^/]+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+  });
+
   const clearResetToken = () => {
     const url = new URL(window.location.href);
     url.pathname = '/';
     url.searchParams.delete('token');
     window.history.replaceState({}, '', url.pathname + url.search);
+    window.location.reload();
+  };
+
+  const goHome = () => {
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    window.history.replaceState({}, '', url.pathname);
     window.location.reload();
   };
 
@@ -69,6 +84,10 @@ export default function App() {
 
   if (resetToken || isResetPasswordRoute) {
     return <ResetPassword token={resetToken} onDone={clearResetToken} />;
+  }
+
+  if (shareToken) {
+    return <SharedChatView token={shareToken} onDone={goHome} />;
   }
 
   if (loading) {

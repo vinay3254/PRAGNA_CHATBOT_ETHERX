@@ -102,7 +102,10 @@ const Sidebar = ({
   const handleShare = async (chatId) => {
     try {
       setLoading('share')
-      const result = await ChatManagementAPI.shareChat(chatId)
+      const targetChat = recentChats.find((c) => c.id === chatId)
+      const title = targetChat?.title || 'New chat'
+      const messages = targetChat?.messages || []
+      const result = await ChatManagementAPI.shareChat(chatId, title, messages)
       const shareUrl = `${window.location.origin}${result.share_url}`
       await navigator.clipboard.writeText(shareUrl)
       alert(`Share link copied to clipboard!\n${shareUrl}`)

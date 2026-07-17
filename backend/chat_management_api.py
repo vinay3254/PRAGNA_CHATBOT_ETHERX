@@ -181,33 +181,65 @@ def delete_chat(chat_id):
 @chat_management_bp.route('/<chat_id>/share', methods=['POST'])
 @require_auth
 def share_chat(chat_id):
-    """Generate a shareable link for a chat"""
+    """Generate a shareable link for a chat.
+
+    Chats live client-side (localStorage) in this app's local-first design, so
+    the backend has no message history for chat_id until the client sends one.
+    The frontend passes the current snapshot (title + messages) here, which
+    gets persisted so the public /api/share/<token> endpoint has something to
+    serve. Re-sharing an already-shared chat re-syncs the snapshot and reuses
+    the same conversation row (a new token is still minted each call).
+    """
     try:
         user_id = request.user_id
-        
+
         # Validate ownership
         if not validate_chat_ownership(chat_id, user_id):
             return jsonify({'error': 'Unauthorized: Chat not found or not owned by user'}), 403
-        
+
+        data = request.get_json(silent=True) or {}
+        title = (data.get('title') or '').strip()
+        messages = data.get('messages') or []
+
         # Generate a unique share token
         share_token = secrets.token_urlsafe(32)
-        
+
         conn = db.get_connection()
         c = conn.cursor()
-        
-        # Update or insert share token
-        c.execute('''
-            UPDATE conversations 
-            SET share_token = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ''', (share_token, chat_id))
-        
+
+        if title:
+            c.execute('''
+                UPDATE conversations
+                SET title = ?, share_token = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (title[:200], share_token, chat_id))
+        else:
+            c.execute('''
+                UPDATE conversations
+                SET share_token = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (share_token, chat_id))
+
+        if isinstance(messages, list) and messages:
+            # Replace any previously-synced snapshot with the current one.
+            c.execute('DELETE FROM messages WHERE conversation_id = ?', (chat_id,))
+            for msg in messages:
+                sender = (msg.get('sender') or '').strip()
+                text = (msg.get('text') or '').strip()
+                if sender not in ('user', 'bot') or not text:
+                    continue
+                message_id = secrets.token_hex(16)
+                c.execute('''
+                    INSERT INTO messages (id, conversation_id, sender, text)
+                    VALUES (?, ?, ?, ?)
+                ''', (message_id, chat_id, sender, text))
+
         conn.commit()
         conn.close()
-        
+
         # Generate shareable URL (frontend will use this)
         share_url = f"/share/{share_token}"
-        
+
         return jsonify({
             'success': True,
             'chat_id': chat_id,
@@ -215,7 +247,7 @@ def share_chat(chat_id):
             'share_url': share_url,
             'message': 'Chat shared successfully'
         }), 200
-    
+
     except Exception as e:
         logger.error(f"Error sharing chat: {str(e)}")
         return jsonify({'error': 'Failed to share chat'}), 500

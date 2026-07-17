@@ -1026,6 +1026,43 @@ def models_catalog():
     })
 
 
+@app.route('/api/share/<token>', methods=['GET'])
+def get_shared_chat(token):
+    """Public, read-only fetch of a shared chat by its share token.
+
+    Deliberately has no @require_auth - a share link is meant to be viewable
+    by anyone holding the URL, not just the chat's owner.
+    """
+    try:
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute(
+            'SELECT id, title, created_at FROM conversations WHERE share_token = ?',
+            (token,)
+        )
+        convo = c.fetchone()
+        if not convo:
+            conn.close()
+            return jsonify({'error': 'Shared chat not found'}), 404
+
+        c.execute(
+            'SELECT sender, text, timestamp FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC, rowid ASC',
+            (convo['id'],)
+        )
+        messages = [dict(row) for row in c.fetchall()]
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'title': convo['title'],
+            'created_at': convo['created_at'],
+            'messages': messages,
+        })
+    except Exception as e:
+        logger.error(f"Get shared chat error: {e}")
+        return jsonify({'error': 'Failed to load shared chat'}), 500
+
+
 @app.route('/api/world-monitor/config', methods=['GET'])
 def world_monitor_config():
     """Expose World Monitor integration metadata to the frontend dashboard."""

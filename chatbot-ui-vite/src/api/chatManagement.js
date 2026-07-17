@@ -63,9 +63,12 @@ export const ChatManagementAPI = {
     }
   },
 
-  shareChat: async (chatId) => {
+  shareChat: async (chatId, title, messages) => {
     try {
-      const response = await api.post(`/api/chat/${chatId}/share`)
+      const response = await api.post(`/api/chat/${chatId}/share`, {
+        title,
+        messages,
+      })
       return response.data
     } catch (error) {
       console.error('Error sharing chat:', error)

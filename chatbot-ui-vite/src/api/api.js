@@ -292,6 +292,15 @@ export const getModelsCatalog = async () => {
   return response.json();
 };
 
+export const getSharedChat = async (token) => {
+  const response = await fetch(`${API_BASE}/api/share/${encodeURIComponent(token)}`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "This shared chat link is invalid or has expired.");
+  }
+  return data;
+};
+
 export const summarizeChat = async (messages, language) => {
   const response = await fetch(`${API_BASE}/api/summarize_chat`, {
     method: "POST",
