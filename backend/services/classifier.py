@@ -87,15 +87,25 @@ def _parse_classifier_json(content: str) -> Dict[str, object]:
         return {}
 
 
+def _contains_keyword(lowered: str, keyword: str) -> bool:
+    """Match keyword as a whole word/phrase, not a bare substring.
+
+    Plain `keyword in lowered` false-positives on e.g. "know" containing
+    "now", or "wonder" containing "won" - misrouting ordinary chat into
+    the realtime/news intent paths.
+    """
+    return re.search(r"(?<!\w)" + re.escape(keyword) + r"(?!\w)", lowered) is not None
+
+
 def _fallback_intent(query: str) -> str:
     lowered = query.lower()
     if _looks_like_math_query(lowered):
         return "tool"
-    if any(keyword in lowered for keyword in _FALLBACK_KEYWORDS["tool"]):
+    if any(_contains_keyword(lowered, keyword) for keyword in _FALLBACK_KEYWORDS["tool"]):
         return "tool"
-    if any(keyword in lowered for keyword in _FALLBACK_KEYWORDS["news"]):
+    if any(_contains_keyword(lowered, keyword) for keyword in _FALLBACK_KEYWORDS["news"]):
         return "news"
-    if any(keyword in lowered for keyword in _FALLBACK_KEYWORDS["realtime"]):
+    if any(_contains_keyword(lowered, keyword) for keyword in _FALLBACK_KEYWORDS["realtime"]):
         return "realtime"
     return "general"
 
